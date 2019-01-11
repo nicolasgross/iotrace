@@ -10,7 +10,7 @@
 
 
 int do_child(int argc, char **argv);
-int do_trace(pid_t child);
+int do_tracer(pid_t child);
 int wait_for_syscall(pid_t child);
 
 int main(int argc, char **argv) {
@@ -19,11 +19,13 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	pid_t child = fork();
-	if (child == 0) {
+	pid_t pid = fork();
+	if (pid == 0) {
+		// child
 		return do_child(argc-1, argv+1);
 	} else {
-		return do_trace(child);
+		// parent
+		return do_tracer(pid);
 	}
 }
 
@@ -33,37 +35,49 @@ int do_child(int argc, char **argv) {
 	args[argc] = NULL;
 
 	ptrace(PTRACE_TRACEME);
-	kill(getpid(), SIGSTOP);
+	kill(getpid(), SIGSTOP); // notify parent that tracing can start
 	return execvp(args[0], args);
 }
 
-int do_trace(pid_t child) {
-	int status, syscall, retval;
-	waitpid(child, &status, 0);
-	ptrace(PTRACE_SETOPTIONS, child, 0, PTRACE_O_TRACESYSGOOD);
+int do_tracer(pid_t tracee) {
+	int status;
+	int syscall;
+	int retval;
+	waitpid(tracee, &status, 0); // wait for notification
+	ptrace(PTRACE_SETOPTIONS, tracee, 0,
+	       PTRACE_O_TRACECLONE | // trace cloned processes
+	       PTRACE_O_TRACEFORK | // trace forked processes
+	       PTRACE_O_TRACEVFORK | // trace vforked processes
+	       PTRACE_O_TRACESYSGOOD | // get syscall info
+	       PTRACE_O_EXITKILL); // send SIGKILL to tracee if tracer exits
 	while(1) {
-		if (wait_for_syscall(child) != 0) break;
+		if (wait_for_syscall(tracee) != 0) break;
 
-		syscall = ptrace(PTRACE_PEEKUSER, child, sizeof(long)*ORIG_RAX);
+		// syscall call
+		syscall = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
 		fprintf(stderr, "syscall(%d) = ", syscall);
 
-		if (wait_for_syscall(child) != 0) break;
+		if (wait_for_syscall(tracee) != 0) break;
 
-		retval = ptrace(PTRACE_PEEKUSER, child, sizeof(long)*RAX);
+		// syscall return value
+		retval = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 		fprintf(stderr, "%d\n", retval);
 	}
 	return 0;
 }
 
-int wait_for_syscall(pid_t child) {
+int wait_for_syscall(pid_t tracee) {
 	int status;
 	while (1) {
-		ptrace(PTRACE_SYSCALL, child, 0, 0);
-		waitpid(child, &status, 0);
+		ptrace(PTRACE_SYSCALL, tracee, 0, 0); // run until syscall
+		waitpid(tracee, &status, __WALL);
 		if (WIFSTOPPED(status) && WSTOPSIG(status) & 0x80) {
+			// stopped by a syscall
 			return 0;
 		}
+		// TODO handle PID of forked/vforked/cloned process
 		if (WIFEXITED(status)) {
+			// tracee exited
 			return 1;
 		}
     }
