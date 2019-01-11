@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 project(iotrace)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_FLAGS "-Wall")
+set(CMAKE_C_FLAGS "-std=c11 -Wall")
 
 file(GLOB SRCFILES
         "src/*.c"
