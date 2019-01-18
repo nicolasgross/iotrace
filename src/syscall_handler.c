@@ -5,11 +5,11 @@
 #include <sys/syscall.h>
 
 #include "syscall_handler.h"
+#include "syscall_names.h"
 
 
 static const char *const syscall_to_string(int syscall) {
-	// TODO
-	return "openat";
+	return syscall_names[syscall];
 }
 
 // ---- openat ----
