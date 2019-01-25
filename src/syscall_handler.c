@@ -45,9 +45,8 @@ static void read_string(pid_t tracee, unsigned long base, char *dest,
 	dest[len - 1] = 0;
 }
 
-static void print_retval(pid_t tracee) {
-	int retval = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	printf("%d\n", retval);
+static unsigned long get_retval(pid_t tracee) {
+	return ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 }
 
 
@@ -64,7 +63,7 @@ static void handle_openat_call(pid_t tracee, int syscall) {
 }
 
 static void handle_openat_return(pid_t tracee) {
-	print_retval(tracee);
+	printf("%d\n", (int) get_retval(tracee));
 }
 
 
@@ -75,7 +74,7 @@ static void handle_unmatched_call(pid_t tracee, int syscall) {
 }
 
 static void handle_unmatched_return(pid_t tracee) {
-	print_retval(tracee);
+	printf("%d\n", (int) get_retval(tracee));
 }
 
 
