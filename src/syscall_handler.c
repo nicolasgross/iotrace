@@ -45,10 +45,16 @@ static void read_string(pid_t tracee, unsigned long base, char *dest,
 	dest[len - 1] = 0;
 }
 
+static void print_retval(pid_t tracee) {
+	int retval = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	printf("%d\n", retval);
+}
+
+
 // ---- openat ----
 
-static void handle_openat_call(pid_t tracee) {
-	printf("%s", syscall_to_string(SYS_openat));
+static void handle_openat_call(pid_t tracee, int syscall) {
+	printf("%s", syscall_to_string(syscall));
 	read_regs(tracee);
 	const size_t buf_size = 256;
 	char filename[buf_size];
@@ -58,15 +64,28 @@ static void handle_openat_call(pid_t tracee) {
 }
 
 static void handle_openat_return(pid_t tracee) {
-	int retval = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	printf("%d\n", retval);
+	print_retval(tracee);
+}
+
+
+// ---- unmatched ----
+
+static void handle_unmatched_call(pid_t tracee, int syscall) {
+	printf("%s(...) = ", syscall_to_string(syscall));
+}
+
+static void handle_unmatched_return(pid_t tracee) {
+	print_retval(tracee);
 }
 
 
 void handle_syscall_call(pid_t tracee, int syscall) {
 	switch(syscall) {
 		case SYS_openat:
-			handle_openat_call(tracee);
+			handle_openat_call(tracee, syscall);
+			break;
+		default:
+			handle_unmatched_call(tracee, syscall);
 			break;
 	}
 }
@@ -75,6 +94,9 @@ void handle_syscall_return(pid_t tracee, int syscall) {
 	switch(syscall) {
 		case SYS_openat:
 			handle_openat_return(tracee);
+			break;
+		default:
+			handle_unmatched_return(tracee);
 			break;
 	}
 }

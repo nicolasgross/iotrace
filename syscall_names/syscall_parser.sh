@@ -16,7 +16,7 @@ tbl=`cat $in | grep -o '^[^#]*'`
 
 # .c file:
 
-echo "#define UNDEFINED \"UNDEFINED\"\n" > "$out_c"
+echo "#include \"syscall_names.h\"\n\n" > "$out_c"
 echo "const char *const syscall_names[] = {" >> "$out_c"
 
 lastnum=-1
@@ -25,7 +25,7 @@ while read nr abi name entry; do
 	tmp=$(($nr - 1))
 	while [ "$lastnum" -lt "$tmp" ]; do
 		lastnum=$(($lastnum + 1))
-		`echo "\tUNDEFINED,\t\t// nr: $lastnum" >> "$out_c"`
+		`echo "\tUNDEFINED_SYSCALL,\t\t// nr: $lastnum" >> "$out_c"`
 	done
 	`echo "\t\"$name\",\t\t// nr: $nr, abi: $abi" >> "$out_c"`
 	lastnum=$nr
@@ -37,8 +37,9 @@ echo "};\n" >> "$out_c"
 
 echo "#ifndef IOTRACE_SYSCALL_NAMES_H" > "$out_h"
 echo "#define IOTRACE_SYSCALL_NAMES_H\n" >> "$out_h"
-name_count=$((`wc -l < "$out_c"` - 5))
-echo "#define NAMES_LENGTH $name_count\n" >> "$out_h"
-echo "extern const char *const syscall_names[NAMES_LENGTH];\n" >> "$out_h"
+echo "#define UNDEFINED_SYSCALL \"UNDEFINED_SYSCALL\"" >> "$out_h"
+name_count=$((`wc -l < "$out_c"` - 6))
+echo "#define NAMES_LENGTH $name_count\n\n" >> "$out_h"
+echo "extern const char *const syscall_names[NAMES_LENGTH];\n\n" >> "$out_h"
 echo "#endif\n" >> "$out_h"
 
