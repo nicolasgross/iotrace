@@ -67,6 +67,20 @@ static void handle_openat_return(pid_t tracee) {
 }
 
 
+// TODO:
+// ---- execve ----
+// ---- dup2 ----
+// ---- open ----
+// ---- open_from ----
+// ---- eventfd2 ----
+// ---- socket ----
+// ---- socketpair ----
+// ---- pipe ----
+// ---- close ----
+// ---- write ----
+// ---- read ----
+
+
 // ---- unmatched ----
 
 static void handle_unmatched_call(pid_t tracee, int syscall) {
