@@ -29,7 +29,7 @@ while read nr abi name entry; do
 	done
 	`echo "\t\"$name\",\t\t// nr: $nr, abi: $abi" >> "$out_c"`
 	lastnum=$nr
-done;
+done
 
 echo "};\n" >> "$out_c"
 
