@@ -1,4 +1,3 @@
-#define _POSIX_SOURCE
 #include <sys/ptrace.h>
 #include <sys/reg.h>
 #include <sys/wait.h>
@@ -9,6 +8,7 @@
 #include <signal.h>
 
 #include "syscall_handler.h"
+#include "fd_table.h"
 
 
 static int start_tracee(int argc, char **argv) {
@@ -30,7 +30,8 @@ static int wait_for_syscall(pid_t tracee) {
 			// stopped by a syscall
 			return 0;
 		}
-		// TODO handle PID of forked/vforked/cloned process
+		// TODO handle PID of forked/vforked/cloned process and create new
+		// thread that runs 'start_tracer'
 		if (WIFEXITED(status)) {
 			// tracee exited
 			return 1;
@@ -39,6 +40,7 @@ static int wait_for_syscall(pid_t tracee) {
 }
 
 static int start_tracer(pid_t tracee) {
+	fd_table table = fd_table_create();
 	int status;
 	int syscall;
 	waitpid(tracee, &status, 0); // wait for notification
@@ -53,15 +55,16 @@ static int start_tracer(pid_t tracee) {
 			break;
 		}
 		// syscall call
-		syscall = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
-		handle_syscall_call(tracee, syscall);
+		syscall = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
+		handle_syscall_call(tracee, table, syscall);
 
 		if (wait_for_syscall(tracee) != 0) {
 			break;
 		}
 		// syscall return
-		handle_syscall_return(tracee, syscall);
+		handle_syscall_return(tracee, table, syscall);
 	}
+	fd_table_free(table);
 	return 0;
 }
 
@@ -77,5 +80,8 @@ int main(int argc, char **argv) {
 	} else {
 		return start_tracer(pid);
 	}
+
+	// TODO Wait for remaining threads
+	// TODO print statistics as json
 }
 

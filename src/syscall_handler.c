@@ -10,9 +10,12 @@
 
 #include "syscall_handler.h"
 #include "syscall_names.h"
+#include "fd_table.h"
 
 
 static struct user_regs_struct regs;
+
+// TODO store open information in struct
 
 
 static const char *const syscall_to_string(int syscall) {
@@ -29,8 +32,8 @@ static void read_regs(pid_t tracee) {
 static void read_string(pid_t tracee, unsigned long base, char *dest,
                         const size_t len) {
 	for (size_t i = 0; i * 8 < len; i++) {
-		unsigned long data = ptrace(PTRACE_PEEKDATA, tracee,
-		                            base + (i * sizeof(long)), NULL);
+		long data = ptrace(PTRACE_PEEKDATA, tracee,
+		                   base + (i * sizeof(long)), NULL);
 		if (data == -1) {
 			fprintf(stderr, "%s", "Error while reading a string");
 			exit(1);
@@ -45,7 +48,7 @@ static void read_string(pid_t tracee, unsigned long base, char *dest,
 	dest[len - 1] = 0;
 }
 
-static unsigned long get_retval(pid_t tracee) {
+static long get_retval(pid_t tracee) {
 	return ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 }
 
@@ -53,32 +56,29 @@ static unsigned long get_retval(pid_t tracee) {
 // ---- openat ----
 
 static void handle_openat_call(pid_t tracee, int syscall) {
-	printf("%s", syscall_to_string(syscall));
-	read_regs(tracee);
-	const size_t buf_size = 256;
-	char filename[buf_size];
-	read_string(tracee, regs.rsi, filename, buf_size);
-	printf("(%d, \"%s\", %d, %d) = ", (int) regs.rdi, filename,
-	       (int) regs.rdx, (int) regs.r10);
+	// TODO store filename, time
 }
 
 static void handle_openat_return(pid_t tracee) {
-	printf("%d\n", (int) get_retval(tracee));
+	// TODO store fd, time
+	// TODO add fd/filename to mapping table
+	// TODO update file stat open count
 }
 
-
-// TODO:
-// ---- execve ----
-// ---- dup2 ----
+// TODO now:
 // ---- open ----
 // ---- open_from ----
+// ---- close ----
+// ---- read ----
+// ---- write ----
+
+// TODO later:
+// ---- execve ----
+// ---- dup2 ----
 // ---- eventfd2 ----
 // ---- socket ----
 // ---- socketpair ----
 // ---- pipe ----
-// ---- close ----
-// ---- write ----
-// ---- read ----
 
 
 // ---- unmatched ----
@@ -92,7 +92,7 @@ static void handle_unmatched_return(pid_t tracee) {
 }
 
 
-void handle_syscall_call(pid_t tracee, int syscall) {
+void handle_syscall_call(pid_t tracee, fd_table table, int syscall) {
 	switch(syscall) {
 		case SYS_openat:
 			handle_openat_call(tracee, syscall);
@@ -103,7 +103,7 @@ void handle_syscall_call(pid_t tracee, int syscall) {
 	}
 }
 
-void handle_syscall_return(pid_t tracee, int syscall) {
+void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
 	switch(syscall) {
 		case SYS_openat:
 			handle_openat_return(tracee);
