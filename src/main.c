@@ -73,14 +73,7 @@ static int main_tracer(int pid) {
 	file_stat_init();
 	int err = start_tracer(pid);
 	// TODO Wait for remaining threads
-
-	// Only for testing:
-	file_stat *test = file_stat_get("./test-file.txt");
-	printf("\ncount: %llu total: %llu min: %llu max: %llu\n",
-	       test->open_stats.count, test->open_stats.total_ns,
-	       test->open_stats.min_ns, test->open_stats.max_ns);
-
-
+	file_stat_print_all();
 	// TODO print statistics as json
 	file_stat_free();
 	return err;

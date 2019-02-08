@@ -27,6 +27,8 @@ void file_stat_incr_open(char *name, unsigned long long time_ns);
 
 void file_stat_incr_close(char *name, unsigned long long time_ns);
 
+void file_stat_print_all(void);
+
 
 #endif
 

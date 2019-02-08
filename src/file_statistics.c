@@ -1,4 +1,5 @@
 #include <glib.h>
+#include <stdio.h>
 
 #include "file_statistics.h"
 
@@ -70,6 +71,27 @@ void file_stat_incr_close(char *filename, unsigned long long time_ns) {
 	}
 	if (tmp->close_stats.max_ns < time_ns) {
 		tmp->close_stats.max_ns = time_ns;
+	}
+}
+
+void file_stat_print_all(void) {
+	GHashTableIter iter;
+	gpointer key;
+	gpointer value;
+	g_hash_table_iter_init (&iter, stat_table);
+
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		file_stat *tmp = value;
+		printf("File: %s\n", (char *) key);
+		printf("  open  -> count: %llu, total: %llu ns, min: %llu ns, "
+		       "max: %llu ns\n",
+		       tmp->open_stats.count, tmp->open_stats.total_ns,
+		       tmp->open_stats.min_ns, tmp->open_stats.max_ns);
+		printf("  close -> count: %llu, total: %llu ns, min: %llu ns, "
+		       "max: %llu ns\n",
+		       tmp->close_stats.count, tmp->close_stats.total_ns,
+		       tmp->close_stats.min_ns, tmp->close_stats.max_ns);
+		printf("\n");
 	}
 }
 

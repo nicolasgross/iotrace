@@ -111,11 +111,11 @@ static void handle_openat_return(pid_t tracee, fd_table table) {
 // ---- unmatched ----
 
 static void handle_unmatched_call(pid_t tracee, int syscall) {
-	printf("%s(...) = ", syscall_names[syscall]);
+	// printf("%s(...) = ", syscall_names[syscall]);
 }
 
 static void handle_unmatched_return(pid_t tracee) {
-	printf("%d\n", (int) get_retval(tracee));
+	// printf("%d\n", (int) get_retval(tracee));
 }
 
 
