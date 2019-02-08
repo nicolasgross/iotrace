@@ -18,11 +18,11 @@ fd_table fd_table_create(void);
  * Inserts a new file descriptor and filename into the table.
  *
  * @param table the mapping table.
- * @param fd a pointer to the file descriptor.
- * @param filename a pointer to the filename.
+ * @param fd the file descriptor.
+ * @param filename the filename.
  * @return {@code true} if there was no entry for the file descriptor.
  */
-bool fd_table_insert(fd_table table, int *fd, char *filename);
+bool fd_table_insert(fd_table table, int fd, char *filename);
 
 /**
  * Removes a file descriptor and its corresponding file name from the table.
