@@ -30,7 +30,7 @@ bool fd_table_remove(fd_table table, int fd) {
 	return (bool) g_hash_table_remove(table, &fd);
 }
 
-char const *fd_table_map(fd_table table, int fd) {
+char const *fd_table_lookup(fd_table table, int fd) {
 	return g_hash_table_lookup(table, &fd);
 }
 

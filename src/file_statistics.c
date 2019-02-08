@@ -21,7 +21,7 @@ static void init_file_stat(file_stat *stat) {
 	// TODO other stats
 }
 
-static void stat_table_insert(char *filename) {
+static void stat_table_insert(char const *filename) {
 	size_t len = strlen(filename);
 	char *name_mem = malloc(sizeof(char) * (len + 1));
 	strcpy(name_mem, filename);
@@ -42,7 +42,7 @@ file_stat *file_stat_get(char const *filename) {
 	return g_hash_table_lookup(stat_table, filename);
 }
 
-void file_stat_incr_open(char *filename, unsigned long long time_ns) {
+void file_stat_incr_open(char const *filename, unsigned long long time_ns) {
 	file_stat *tmp = file_stat_get(filename);
 	if (tmp == NULL) {
 		stat_table_insert(filename);
@@ -58,7 +58,7 @@ void file_stat_incr_open(char *filename, unsigned long long time_ns) {
 	}
 }
 
-void file_stat_incr_close(char *filename, unsigned long long time_ns) {
+void file_stat_incr_close(char const *filename, unsigned long long time_ns) {
 	file_stat *tmp = file_stat_get(filename);
 	if (tmp == NULL) {
 		stat_table_insert(filename);

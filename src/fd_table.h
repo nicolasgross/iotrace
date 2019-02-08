@@ -39,7 +39,7 @@ bool fd_table_remove(fd_table table, int fd);
  * @param fd the file descriptor.
  * @return the filename, can be NULL if no mapping exists.
  */
-char const *fd_table_map(fd_table table, int fd);
+char const *fd_table_lookup(fd_table table, int fd);
 
 /**
  * Frees a file descriptor mapping table.
