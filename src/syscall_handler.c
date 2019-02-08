@@ -62,6 +62,37 @@ static long get_retval(pid_t tracee) {
 }
 
 
+// ---- open ----
+
+static void handle_open_call(pid_t tracee, int syscall) {
+	long base = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	if (read_string(tracee, base, filename_buffer, FILENAME_BUFF_SIZE)) {
+		fprintf(stderr, "%s", "Error while reading filename of openat");
+		exit(1);
+	}
+	if (clock_gettime(USED_CLOCK, &start_time)) {
+		fprintf(stderr, "%s", "Error while reading start time of openat");
+		exit(1);
+	}
+}
+
+static void handle_open_return(pid_t tracee, fd_table table) {
+	struct timespec current_time;
+	if (clock_gettime(USED_CLOCK, &current_time)) {
+		fprintf(stderr, "%s", "Error while reading end time of open/openat");
+		exit(1);
+	}
+	unsigned long long start_ns = start_time.tv_sec * NANOS +
+	                              start_time.tv_nsec;
+	unsigned long long current_ns = current_time.tv_sec * NANOS +
+	                                current_time.tv_nsec;
+	unsigned long long elapsed_ns = current_ns - start_ns;
+	long fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	fd_table_insert(table, fd, filename_buffer);
+	file_stat_incr_open(filename_buffer, elapsed_ns);
+}
+
+
 // ---- openat ----
 
 static void handle_openat_call(pid_t tracee, int syscall) {
@@ -76,25 +107,9 @@ static void handle_openat_call(pid_t tracee, int syscall) {
 	}
 }
 
-static void handle_openat_return(pid_t tracee, fd_table table) {
-	struct timespec current_time;
-	if (clock_gettime(USED_CLOCK, &current_time)) {
-		fprintf(stderr, "%s", "Error while reading end time of openat");
-		exit(1);
-	}
-	unsigned long long start_ns = start_time.tv_sec * NANOS +
-	                              start_time.tv_nsec;
-	unsigned long long current_ns = current_time.tv_sec * NANOS +
-	                                current_time.tv_nsec;
-	unsigned long long elapsed_ns = current_ns - start_ns;
-	long fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	fd_table_insert(table, fd, filename_buffer);
-	file_stat_incr_open(filename_buffer, elapsed_ns);
-}
 
 // TODO now:
 // ---- open ----
-// ---- open_from ----
 // ---- close ----
 // ---- read ----
 // ---- write ----
@@ -121,6 +136,9 @@ static void handle_unmatched_return(pid_t tracee) {
 
 void handle_syscall_call(pid_t tracee, fd_table table, int syscall) {
 	switch(syscall) {
+		case SYS_open:
+			handle_open_call(tracee, syscall);
+			break;
 		case SYS_openat:
 			handle_openat_call(tracee, syscall);
 			break;
@@ -132,8 +150,11 @@ void handle_syscall_call(pid_t tracee, fd_table table, int syscall) {
 
 void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
 	switch(syscall) {
+		case SYS_open:
+			handle_open_return(tracee, table);
+			break;
 		case SYS_openat:
-			handle_openat_return(tracee, table);
+			handle_open_return(tracee, table);
 			break;
 		default:
 			handle_unmatched_return(tracee);
