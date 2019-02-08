@@ -3,17 +3,26 @@
 
 
 typedef struct {
-	unsigned long long count;
-	unsigned long long total_ns;
-	unsigned long long min_ns;
-	unsigned long long max_ns;
+	unsigned long long count;           // number of opens/closes
+	unsigned long long total_ns;        // total time in nanoseconds
+	unsigned long long min_ns;          // min time in nanoseconds
+	unsigned long long max_ns;          // max time in nanoseconds
 } open_close_stat;
+
+typedef struct {
+	unsigned long long total_b;         // total number of bytes
+	unsigned long long total_ns;        // total time in nanoseconds
+	unsigned long long min_bps;         // min bytes per second
+	unsigned long long max_bps;         // max bytes per second
+} read_write_stat;
 
 typedef struct {
 	open_close_stat open_stats;
 	open_close_stat close_stats;
-	// TODO read: count + block size, min time, max time
-	// TODO write: count + block size, min time, max time
+	read_write_stat read_stats;
+	read_write_stat write_stats;
+	// TODO read: count + block size
+	// TODO write: count + block size
 } file_stat;
 
 

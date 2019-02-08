@@ -18,6 +18,16 @@ static void init_file_stat(file_stat *stat) {
 	stat->close_stats.min_ns = ULLONG_MAX;
 	stat->close_stats.max_ns = 0;
 
+	stat->read_stats.total_b = 0;
+	stat->read_stats.total_ns = 0;
+	stat->read_stats.min_bps = ULLONG_MAX;
+	stat->read_stats.max_bps = 0;
+
+	stat->write_stats.total_b = 0;
+	stat->write_stats.total_ns = 0;
+	stat->write_stats.min_bps = ULLONG_MAX;
+	stat->write_stats.max_bps = 0;
+
 	// TODO other stats
 }
 
@@ -91,6 +101,14 @@ void file_stat_print_all(void) {
 		       "max: %llu ns\n",
 		       tmp->close_stats.count, tmp->close_stats.total_ns,
 		       tmp->close_stats.min_ns, tmp->close_stats.max_ns);
+		printf("  read  -> total bytes: %llu, total time: %llu ns, "
+		       "min: %llu byte/s, max: %llu byte/s\n",
+		       tmp->read_stats.total_b, tmp->read_stats.total_ns,
+		       tmp->read_stats.min_bps, tmp->read_stats.max_bps);
+		printf("  write -> total bytes: %llu, total time: %llu ns, "
+		       "min: %llu byte/s, max: %llu byte/s\n",
+		       tmp->write_stats.total_b, tmp->write_stats.total_ns,
+		       tmp->write_stats.min_bps, tmp->write_stats.max_bps);
 		printf("\n");
 	}
 }
