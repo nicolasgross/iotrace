@@ -8,6 +8,7 @@
 #include <signal.h>
 
 #include "syscall_handler.h"
+#include "file_statistics.h"
 #include "fd_table.h"
 
 
@@ -68,6 +69,23 @@ static int start_tracer(pid_t tracee) {
 	return 0;
 }
 
+static int main_tracer(int pid) {
+	file_stat_init();
+	int err = start_tracer(pid);
+	// TODO Wait for remaining threads
+
+	// Only for testing:
+	file_stat *test = file_stat_get("./test-file.txt");
+	printf("\ncount: %llu total: %llu min: %llu max: %llu\n",
+	       test->open_stats.count, test->open_stats.total_ns,
+	       test->open_stats.min_ns, test->open_stats.max_ns);
+
+
+	// TODO print statistics as json
+	file_stat_free();
+	return err;
+}
+
 int main(int argc, char **argv) {
 	if (argc < 2) {
 		fprintf(stderr, "Usage: %s prog args\n", argv[0]);
@@ -78,10 +96,7 @@ int main(int argc, char **argv) {
 	if (pid == 0) {
 		return start_tracee(argc-1, argv+1);
 	} else {
-		return start_tracer(pid);
+		return main_tracer(pid);
 	}
-
-	// TODO Wait for remaining threads
-	// TODO print statistics as json
 }
 

@@ -17,7 +17,7 @@ tbl=`cat $in | grep -o '^[^#]*'`
 # .c file:
 
 echo "#include \"syscall_names.h\"\n\n" > "$out_c"
-echo "const char *const syscall_names[] = {" >> "$out_c"
+echo "char const *const syscall_names[] = {" >> "$out_c"
 
 lastnum=-1
 printf "%s" "$tbl" |

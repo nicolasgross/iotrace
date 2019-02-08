@@ -1,7 +1,7 @@
 #include "syscall_names.h"
 
 
-const char *const syscall_names[] = {
+char const *const syscall_names[] = {
 	"read",		// nr: 0, abi: common
 	"write",		// nr: 1, abi: common
 	"open",		// nr: 2, abi: common

@@ -20,9 +20,8 @@ fd_table fd_table_create(void);
  * @param table the mapping table.
  * @param fd the file descriptor.
  * @param filename the filename.
- * @return {@code true} if there was no entry for the file descriptor.
  */
-bool fd_table_insert(fd_table table, int fd, char *filename);
+void fd_table_insert(fd_table table, int fd, char *filename);
 
 /**
  * Removes a file descriptor and its corresponding file name from the table.
@@ -40,7 +39,7 @@ bool fd_table_remove(fd_table table, int fd);
  * @param fd the file descriptor.
  * @return the filename, can be NULL if no mapping exists.
  */
-char const *const fd_table_map(fd_table table, int fd);
+char const *fd_table_map(fd_table table, int fd);
 
 /**
  * Frees a file descriptor mapping table.

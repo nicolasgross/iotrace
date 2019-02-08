@@ -4,9 +4,9 @@
 
 typedef struct {
 	unsigned long long count;
-	unsigned long long total_time;
-	unsigned long long min_time;
-	unsigned long long max_time;
+	unsigned long long total_ns;
+	unsigned long long min_ns;
+	unsigned long long max_ns;
 } open_close_stat;
 
 typedef struct {
@@ -17,15 +17,15 @@ typedef struct {
 } file_stat;
 
 
-void file_stat_init(); // Handle stdin, stdout, stderr
+void file_stat_init(void); // Handle stdin, stdout, stderr
 
-void file_stat_free();
+void file_stat_free(void);
 
-file_stat file_stat_get(char const *filename);
+file_stat *file_stat_get(char const *filename);
 
-void file_stat_incr_open(char *name, long long time_ns);
+void file_stat_incr_open(char *name, unsigned long long time_ns);
 
-void file_stat_incr_close(char *name, long long time_ns);
+void file_stat_incr_close(char *name, unsigned long long time_ns);
 
 
 #endif
