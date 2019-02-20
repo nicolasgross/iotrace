@@ -52,6 +52,7 @@ static void free_single_file_stat(gpointer stat) {
 void file_stat_init(void) {
 	stat_table = g_hash_table_new_full(g_str_hash, g_str_equal, free,
 	                                   free_single_file_stat);
+	stat_table_insert("NULL");
 }
 
 void file_stat_free(void) {
@@ -159,8 +160,7 @@ void file_stat_print_all(void) {
 		       tmp->read_stats.total_b, tmp->read_stats.total_ns,
 		       tmp->read_stats.min_bps, tmp->read_stats.max_bps);
 
-		printf("      blocks: [bytes, count]\n");
-		printf("        ");
+		printf("      blocks [bytes, count] -> ");
 		GHashTableIter subiter;
 		gpointer subkey;
 		gpointer subvalue;
@@ -176,13 +176,13 @@ void file_stat_print_all(void) {
 		       tmp->write_stats.total_b, tmp->write_stats.total_ns,
 		       tmp->write_stats.min_bps, tmp->write_stats.max_bps);
 
-		printf("      blocks: [bytes, count]\n");
-		printf("        ");
+		printf("      blocks [bytes, count] -> ");
 		g_hash_table_iter_init (&subiter, tmp->write_stats.blocks);
 		while (g_hash_table_iter_next (&subiter, &subkey, &subvalue)) {
 			printf("[%ld, %ld], ", *(unsigned long *) subkey,
 			       *(ssize_t *) subvalue);
 		}
+		printf("\n");
 		printf("\n");
 	}
 }

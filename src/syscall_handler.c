@@ -39,7 +39,7 @@ static void read_regs(pid_t tracee) {
 }
 
 static int read_string(pid_t tracee, unsigned long base, char *dest,
-                        const size_t max_len) {
+                       const size_t max_len) {
 	for (size_t i = 0; i * 8 < max_len; i++) {
 		long data = ptrace(PTRACE_PEEKDATA, tracee,
 		                   base + (i * sizeof(long)), NULL);
@@ -90,7 +90,9 @@ static void handle_open_return(pid_t tracee, fd_table table) {
 	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
 	                                                &current_time);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	fd_table_insert(table, ret_fd, filename_buffer);
+	if (fd >=0) {
+		fd_table_insert(table, ret_fd, filename_buffer);
+	}
 	file_stat_incr_open(filename_buffer, elapsed_ns);
 }
 
@@ -113,7 +115,7 @@ static void handle_openat_call(pid_t tracee) {
 // ---- close ----
 
 static void handle_close_call(pid_t tracee) {
-	fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 	if (clock_gettime(USED_CLOCK, &start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of close");
 		exit(1);
@@ -129,6 +131,9 @@ static void handle_close_return(fd_table table) {
 	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
 	                                                &current_time);
 	char const *filename = fd_table_lookup(table, fd);
+	if (filename == NULL) {
+		filename = "NULL";
+	}
 	file_stat_incr_close(filename, elapsed_ns);
 }
 
@@ -136,7 +141,7 @@ static void handle_close_return(fd_table table) {
 // ---- read ----
 
 static void handle_read_call(pid_t tracee) {
-	fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 	if (clock_gettime(USED_CLOCK, &start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of read");
 		exit(1);
@@ -153,6 +158,9 @@ static void handle_read_return(pid_t tracee, fd_table table) {
 	                                                &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	char const *filename = fd_table_lookup(table, fd);
+	if (filename == NULL) {
+		filename = "NULL";
+	}
 	file_stat_incr_read(filename, elapsed_ns, ret_bytes);
 }
 
@@ -160,7 +168,7 @@ static void handle_read_return(pid_t tracee, fd_table table) {
 // ---- write ----
 
 static void handle_write_call(pid_t tracee) {
-	fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 	if (clock_gettime(USED_CLOCK, &start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of write");
 		exit(1);
@@ -177,6 +185,9 @@ static void handle_write_return(pid_t tracee, fd_table table) {
 	                                                &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	char const *filename = fd_table_lookup(table, fd);
+	if (filename == NULL) {
+		filename = "NULL";
+	}
 	file_stat_incr_write(filename, elapsed_ns, ret_bytes);
 }
 
