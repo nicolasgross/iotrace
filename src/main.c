@@ -57,7 +57,7 @@ static int start_tracer(pid_t tracee) {
 		}
 		// syscall call
 		syscall = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
-		handle_syscall_call(tracee, table, syscall);
+		handle_syscall_call(tracee, syscall);
 
 		if (wait_for_syscall(tracee) != 0) {
 			break;

@@ -58,8 +58,13 @@ static int read_string(pid_t tracee, unsigned long base, char *dest,
 	return 0;
 }
 
-static long get_retval(pid_t tracee) {
-	return ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+static unsigned long long calc_elapsed_ns(struct timespec *start_time,
+                                          struct timespec *current_time) {
+	unsigned long long start_ns = start_time->tv_sec * NANOS +
+	                              start_time->tv_nsec;
+	unsigned long long current_ns = current_time->tv_sec * NANOS +
+	                                current_time->tv_nsec;
+	return current_ns - start_ns;
 }
 
 
@@ -125,18 +130,39 @@ static void handle_close_return(fd_table table) {
 		fprintf(stderr, "%s", "Error while reading end time of close");
 		exit(1);
 	}
-	unsigned long long start_ns = start_time.tv_sec * NANOS +
-	                              start_time.tv_nsec;
-	unsigned long long current_ns = current_time.tv_sec * NANOS +
-	                                current_time.tv_nsec;
-	unsigned long long elapsed_ns = current_ns - start_ns;
+	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
+	                                                &current_time);
 	char const *filename = fd_table_lookup(table, fd);
 	file_stat_incr_close(filename, elapsed_ns);
 }
 
 
-// TODO now:
 // ---- read ----
+
+static void handle_read_call(pid_t tracee) {
+	fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	if (clock_gettime(USED_CLOCK, &start_time)) {
+		fprintf(stderr, "%s", "Error while reading start time of read");
+		exit(1);
+	}
+}
+
+static void handle_read_return(pid_t tracee, fd_table table) {
+	struct timespec current_time;
+	if (clock_gettime(USED_CLOCK, &current_time)) {
+		fprintf(stderr, "%s", "Error while reading end time of read");
+		exit(1);
+	}
+	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
+	                                                &current_time);
+	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	char const *filename = fd_table_lookup(table, fd);
+	file_stat_incr_read(filename, elapsed_ns, ret_bytes);
+}
+
+
+
+// TODO now:
 // ---- write ----
 
 // TODO later:
@@ -159,7 +185,7 @@ static void handle_close_return(fd_table table) {
 //}
 
 
-void handle_syscall_call(pid_t tracee, fd_table table, int syscall) {
+void handle_syscall_call(pid_t tracee, int syscall) {
 	switch(syscall) {
 		case SYS_open:
 			handle_open_call(tracee);
@@ -169,6 +195,9 @@ void handle_syscall_call(pid_t tracee, fd_table table, int syscall) {
 			break;
 		case SYS_close:
 			handle_close_call(tracee);
+			break;
+		case SYS_read:
+			handle_read_call(tracee);
 			break;
 //		default:
 //			handle_unmatched_call(tracee, syscall);
@@ -186,6 +215,9 @@ void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
 			break;
 		case SYS_close:
 			handle_close_return(table);
+			break;
+		case SYS_read:
+			handle_read_return(tracee, table);
 			break;
 //		default:
 //			handle_unmatched_return(tracee);

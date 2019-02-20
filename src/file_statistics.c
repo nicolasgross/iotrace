@@ -20,13 +20,13 @@ static void init_file_stat(file_stat *stat) {
 
 	stat->read_stats.total_b = 0;
 	stat->read_stats.total_ns = 0;
-	stat->read_stats.min_bps = ULLONG_MAX;
-	stat->read_stats.max_bps = 0;
+	stat->read_stats.min_bps = 9999999999999.0;
+	stat->read_stats.max_bps = 0.0;
 
 	stat->write_stats.total_b = 0;
 	stat->write_stats.total_ns = 0;
-	stat->write_stats.min_bps = ULLONG_MAX;
-	stat->write_stats.max_bps = 0;
+	stat->write_stats.min_bps = 9999999999999.0;
+	stat->write_stats.max_bps = 0.0;
 
 	// TODO other stats
 }
@@ -52,12 +52,17 @@ file_stat *file_stat_get(char const *filename) {
 	return g_hash_table_lookup(stat_table, filename);
 }
 
-void file_stat_incr_open(char const *filename, unsigned long long time_ns) {
+static file_stat *file_stat_get_safe(char const *filename) {
 	file_stat *tmp = file_stat_get(filename);
 	if (tmp == NULL) {
 		stat_table_insert(filename);
 		tmp = file_stat_get(filename);
 	}
+	return tmp;
+}
+
+void file_stat_incr_open(char const *filename, unsigned long long time_ns) {
+	file_stat *tmp = file_stat_get_safe(filename);
 	tmp->open_stats.count++;
 	tmp->open_stats.total_ns += time_ns;
 	if (tmp->open_stats.min_ns > time_ns) {
@@ -69,11 +74,7 @@ void file_stat_incr_open(char const *filename, unsigned long long time_ns) {
 }
 
 void file_stat_incr_close(char const *filename, unsigned long long time_ns) {
-	file_stat *tmp = file_stat_get(filename);
-	if (tmp == NULL) {
-		stat_table_insert(filename);
-		tmp = file_stat_get(filename);
-	}
+	file_stat *tmp = file_stat_get_safe(filename);
 	tmp->close_stats.count++;
 	tmp->close_stats.total_ns += time_ns;
 	if (tmp->close_stats.min_ns > time_ns) {
@@ -81,6 +82,24 @@ void file_stat_incr_close(char const *filename, unsigned long long time_ns) {
 	}
 	if (tmp->close_stats.max_ns < time_ns) {
 		tmp->close_stats.max_ns = time_ns;
+	}
+}
+
+void file_stat_incr_read(char const *filename, unsigned long long time_ns,
+                         ssize_t bytes) {
+	file_stat *tmp = file_stat_get_safe(filename);
+	tmp->read_stats.total_ns += time_ns; // TODO reicht wertebereich
+	if (bytes > 0) {
+		tmp->read_stats.total_b += bytes;
+		double time_s = time_ns / 1000000000.0;
+		double factor = 1 / time_s;
+		double bps = bytes * factor;
+		if (tmp->read_stats.min_bps > bps) {
+			tmp->read_stats.min_bps = bps;
+		}
+		if (tmp->read_stats.max_bps < bps) {
+			tmp->read_stats.max_bps = bps;
+		}
 	}
 }
 
@@ -102,11 +121,11 @@ void file_stat_print_all(void) {
 		       tmp->close_stats.count, tmp->close_stats.total_ns,
 		       tmp->close_stats.min_ns, tmp->close_stats.max_ns);
 		printf("  read  -> total bytes: %llu, total time: %llu ns, "
-		       "min: %llu byte/s, max: %llu byte/s\n",
+		       "min: %f byte/s, max: %f byte/s\n",
 		       tmp->read_stats.total_b, tmp->read_stats.total_ns,
 		       tmp->read_stats.min_bps, tmp->read_stats.max_bps);
 		printf("  write -> total bytes: %llu, total time: %llu ns, "
-		       "min: %llu byte/s, max: %llu byte/s\n",
+		       "min: %f byte/s, max: %f byte/s\n",
 		       tmp->write_stats.total_b, tmp->write_stats.total_ns,
 		       tmp->write_stats.min_bps, tmp->write_stats.max_bps);
 		printf("\n");
