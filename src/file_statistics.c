@@ -148,18 +148,41 @@ void file_stat_print_all(void) {
 		       "max: %llu ns\n",
 		       tmp->open_stats.count, tmp->open_stats.total_ns,
 		       tmp->open_stats.min_ns, tmp->open_stats.max_ns);
+
 		printf("  close -> count: %llu, total: %llu ns, min: %llu ns, "
 		       "max: %llu ns\n",
 		       tmp->close_stats.count, tmp->close_stats.total_ns,
 		       tmp->close_stats.min_ns, tmp->close_stats.max_ns);
+
 		printf("  read  -> total bytes: %llu, total time: %llu ns, "
 		       "min: %f byte/s, max: %f byte/s\n",
 		       tmp->read_stats.total_b, tmp->read_stats.total_ns,
 		       tmp->read_stats.min_bps, tmp->read_stats.max_bps);
+
+		printf("      blocks: [bytes, count]\n");
+		printf("        ");
+		GHashTableIter subiter;
+		gpointer subkey;
+		gpointer subvalue;
+		g_hash_table_iter_init (&subiter, tmp->read_stats.blocks);
+		while (g_hash_table_iter_next (&subiter, &subkey, &subvalue)) {
+			printf("[%ld, %ld], ", *(unsigned long *) subkey,
+			       *(ssize_t *) subvalue);
+		}
+		printf("\n");
+
 		printf("  write -> total bytes: %llu, total time: %llu ns, "
 		       "min: %f byte/s, max: %f byte/s\n",
 		       tmp->write_stats.total_b, tmp->write_stats.total_ns,
 		       tmp->write_stats.min_bps, tmp->write_stats.max_bps);
+
+		printf("      blocks: [bytes, count]\n");
+		printf("        ");
+		g_hash_table_iter_init (&subiter, tmp->write_stats.blocks);
+		while (g_hash_table_iter_next (&subiter, &subkey, &subvalue)) {
+			printf("[%ld, %ld], ", *(unsigned long *) subkey,
+			       *(ssize_t *) subvalue);
+		}
 		printf("\n");
 	}
 }
