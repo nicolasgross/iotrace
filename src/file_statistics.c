@@ -22,13 +22,15 @@ static void init_file_stat(file_stat *stat) {
 	stat->read_stats.total_ns = 0;
 	stat->read_stats.min_bps = 9999999999999.0;
 	stat->read_stats.max_bps = 0.0;
+	stat->read_stats.blocks = g_hash_table_new_full(g_int_hash, g_int_equal,
+	                                                free, free);
 
 	stat->write_stats.total_b = 0;
 	stat->write_stats.total_ns = 0;
 	stat->write_stats.min_bps = 9999999999999.0;
 	stat->write_stats.max_bps = 0.0;
-
-	// TODO other stats
+	stat->write_stats.blocks = g_hash_table_new_full(g_int_hash, g_int_equal,
+	                                                 free, free);
 }
 
 static void stat_table_insert(char const *filename) {
@@ -40,8 +42,16 @@ static void stat_table_insert(char const *filename) {
 	g_hash_table_insert(stat_table, name_mem, stat_mem);
 }
 
+static void free_single_file_stat(gpointer stat) {
+	file_stat *tmp = stat;
+	g_hash_table_destroy(tmp->read_stats.blocks);
+	g_hash_table_destroy(tmp->write_stats.blocks);
+	free(stat);
+}
+
 void file_stat_init(void) {
-	stat_table = g_hash_table_new_full(g_str_hash, g_str_equal, free, free);
+	stat_table = g_hash_table_new_full(g_str_hash, g_str_equal, free,
+	                                   free_single_file_stat);
 }
 
 void file_stat_free(void) {
@@ -100,7 +110,17 @@ static void file_stat_incr_rw(read_write_stat *stat,
 			stat->max_bps = bps;
 		}
 	}
-	// TODO block size table
+	unsigned long *count = g_hash_table_lookup(stat->blocks, &bytes);
+	if (count == NULL) {
+		int *key = malloc(sizeof(ssize_t));
+		*key = bytes;
+		unsigned long *value = malloc(sizeof(unsigned long));
+		*value = 0;
+		g_hash_table_insert(stat->blocks, key, value);
+		count = value;
+	}
+	*count += 1;
+
 }
 
 void file_stat_incr_read(char const *filename, unsigned long long time_ns,

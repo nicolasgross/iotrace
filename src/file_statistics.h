@@ -1,8 +1,11 @@
 #ifndef IOTRACE_FILE_STATISTICS_H
 #define IOTRACE_FILE_STATISTICS_H
 
+#include <glib.h>
 #include <unistd.h>
 
+
+typedef GHashTable *block_table;
 
 typedef struct {
 	unsigned long long count;           // number of opens/closes
@@ -16,7 +19,7 @@ typedef struct {
 	unsigned long long total_ns;        // total time in nanoseconds
 	double min_bps;                     // min bytes per second
 	double max_bps;                     // max bytes per second
-	// TODO block size hash table
+	block_table blocks;                 // block sizes and their count
 } read_write_stat;
 
 typedef struct {
