@@ -15,7 +15,6 @@
 #include "file_statistics.h"
 
 #define FILENAME_BUFF_SIZE 256
-#define NANOS 1000000000LL
 
 #ifdef CLOCK_MONOTONIC_RAW
 	#define USED_CLOCK CLOCK_MONOTONIC_RAW
@@ -60,9 +59,9 @@ static int read_string(pid_t tracee, unsigned long base, char *dest,
 
 static unsigned long long calc_elapsed_ns(struct timespec *start_time,
                                           struct timespec *current_time) {
-	unsigned long long start_ns = start_time->tv_sec * NANOS +
+	unsigned long long start_ns = start_time->tv_sec * 1000000000LL +
 	                              start_time->tv_nsec;
-	unsigned long long current_ns = current_time->tv_sec * NANOS +
+	unsigned long long current_ns = current_time->tv_sec * 1000000000LL +
 	                                current_time->tv_nsec;
 	return current_ns - start_ns;
 }
@@ -88,11 +87,8 @@ static void handle_open_return(pid_t tracee, fd_table table) {
 		fprintf(stderr, "%s", "Error while reading end time of open/openat");
 		exit(1);
 	}
-	unsigned long long start_ns = start_time.tv_sec * NANOS +
-	                              start_time.tv_nsec;
-	unsigned long long current_ns = current_time.tv_sec * NANOS +
-	                                current_time.tv_nsec;
-	unsigned long long elapsed_ns = current_ns - start_ns;
+	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
+	                                                &current_time);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	fd_table_insert(table, ret_fd, filename_buffer);
 	file_stat_incr_open(filename_buffer, elapsed_ns);
@@ -194,6 +190,7 @@ static void handle_write_return(pid_t tracee, fd_table table) {
 // ---- pipe ----
 
 
+// TODO unmatched
 // ---- unmatched ----
 
 //static void handle_unmatched_call(pid_t tracee, int syscall) {
