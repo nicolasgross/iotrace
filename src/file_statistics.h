@@ -40,6 +40,9 @@ void file_stat_incr_close(char const *filename, unsigned long long time_ns);
 void file_stat_incr_read(char const *filename, unsigned long long time_ns,
                          ssize_t bytes);
 
+void file_stat_incr_write(char const *filename, unsigned long long time_ns,
+                          ssize_t bytes);
+
 void file_stat_print_all(void);
 
 

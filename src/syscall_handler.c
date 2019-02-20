@@ -161,9 +161,29 @@ static void handle_read_return(pid_t tracee, fd_table table) {
 }
 
 
-
-// TODO now:
 // ---- write ----
+
+static void handle_write_call(pid_t tracee) {
+	fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	if (clock_gettime(USED_CLOCK, &start_time)) {
+		fprintf(stderr, "%s", "Error while reading start time of write");
+		exit(1);
+	}
+}
+
+static void handle_write_return(pid_t tracee, fd_table table) {
+	struct timespec current_time;
+	if (clock_gettime(USED_CLOCK, &current_time)) {
+		fprintf(stderr, "%s", "Error while reading end time of write");
+		exit(1);
+	}
+	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
+	                                                &current_time);
+	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	char const *filename = fd_table_lookup(table, fd);
+	file_stat_incr_write(filename, elapsed_ns, ret_bytes);
+}
+
 
 // TODO later:
 // ---- execve ----
@@ -199,6 +219,9 @@ void handle_syscall_call(pid_t tracee, int syscall) {
 		case SYS_read:
 			handle_read_call(tracee);
 			break;
+		case SYS_write:
+			handle_write_call(tracee);
+			break;
 //		default:
 //			handle_unmatched_call(tracee, syscall);
 //			break;
@@ -218,6 +241,9 @@ void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
 			break;
 		case SYS_read:
 			handle_read_return(tracee, table);
+			break;
+		case SYS_write:
+			handle_write_return(tracee, table);
 			break;
 //		default:
 //			handle_unmatched_return(tracee);

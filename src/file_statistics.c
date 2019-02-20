@@ -85,22 +85,34 @@ void file_stat_incr_close(char const *filename, unsigned long long time_ns) {
 	}
 }
 
+static void file_stat_incr_rw(read_write_stat *stat,
+                              unsigned long long time_ns, ssize_t bytes) {
+	stat->total_ns += time_ns;
+	if (bytes > 0) {
+		stat->total_b += bytes;
+		double time_s = time_ns / 1000000000.0;
+		double factor = 1.0 / time_s;
+		double bps = bytes * factor;
+		if (stat->min_bps > bps) {
+			stat->min_bps = bps;
+		}
+		if (stat->max_bps < bps) {
+			stat->max_bps = bps;
+		}
+	}
+	// TODO block size table
+}
+
 void file_stat_incr_read(char const *filename, unsigned long long time_ns,
                          ssize_t bytes) {
 	file_stat *tmp = file_stat_get_safe(filename);
-	tmp->read_stats.total_ns += time_ns; // TODO reicht wertebereich
-	if (bytes > 0) {
-		tmp->read_stats.total_b += bytes;
-		double time_s = time_ns / 1000000000.0;
-		double factor = 1 / time_s;
-		double bps = bytes * factor;
-		if (tmp->read_stats.min_bps > bps) {
-			tmp->read_stats.min_bps = bps;
-		}
-		if (tmp->read_stats.max_bps < bps) {
-			tmp->read_stats.max_bps = bps;
-		}
-	}
+	file_stat_incr_rw(&tmp->read_stats, time_ns, bytes);
+}
+
+void file_stat_incr_write(char const *filename, unsigned long long time_ns,
+                          ssize_t bytes) {
+	file_stat *tmp = file_stat_get_safe(filename);
+	file_stat_incr_rw(&tmp->write_stats, time_ns, bytes);
 }
 
 void file_stat_print_all(void) {
