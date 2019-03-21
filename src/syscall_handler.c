@@ -72,11 +72,11 @@ static unsigned long long calc_elapsed_ns(struct timespec *start_time,
 static void handle_open_call(pid_t tracee) {
 	long base = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 	if (read_string(tracee, base, filename_buffer, FILENAME_BUFF_SIZE)) {
-		fprintf(stderr, "%s", "Error while reading filename of openat");
+		fprintf(stderr, "%s", "Error while reading filename of open");
 		exit(1);
 	}
 	if (clock_gettime(USED_CLOCK, &start_time)) {
-		fprintf(stderr, "%s", "Error while reading start time of openat");
+		fprintf(stderr, "%s", "Error while reading start time of open");
 		exit(1);
 	}
 }
