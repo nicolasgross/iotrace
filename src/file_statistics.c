@@ -63,6 +63,10 @@ file_stat *file_stat_get(char const *filename) {
 	return g_hash_table_lookup(stat_table, filename);
 }
 
+GHashTable *file_stat_get_all(void) {
+	return stat_table;
+}
+
 static file_stat *file_stat_get_safe(char const *filename) {
 	file_stat *tmp = file_stat_get(filename);
 	if (tmp == NULL) {

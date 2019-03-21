@@ -28,7 +28,7 @@ void fd_table_insert(fd_table table, int fd, char *filename);
  *
  * @param table the mapping table.
  * @param fd the file descriptor.
- * @return
+ * @return true if file descriptor was found and removed.
  */
 bool fd_table_remove(fd_table table, int fd);
 

@@ -36,6 +36,8 @@ void file_stat_free(void);
 
 file_stat *file_stat_get(char const *filename);
 
+GHashTable *file_stat_get_all(void);
+
 void file_stat_incr_open(char const *filename, unsigned long long time_ns);
 
 void file_stat_incr_close(char const *filename, unsigned long long time_ns);

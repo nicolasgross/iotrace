@@ -10,6 +10,7 @@
 #include "syscall_handler.h"
 #include "file_statistics.h"
 #include "fd_table.h"
+#include "json-printer.h"
 
 
 static int start_tracee(int argc, char **argv) {
@@ -69,27 +70,32 @@ static int start_tracer(pid_t tracee) {
 	return 0;
 }
 
-static int main_tracer(int pid) {
+static int main_tracer(int pid, char const *json_filename) {
 	file_stat_init();
 	int err = start_tracer(pid);
 	// TODO Wait for remaining threads
 	file_stat_print_all();
-	// TODO print statistics as json
+	if (print_stats_as_json(file_stat_get_all(), json_filename)) {
+		printf("File statistics were written to %s", json_filename);
+	} else {
+		fprintf(stderr, "Error, JSON file could not be created");
+		err = 1;
+	}
 	file_stat_free();
 	return err;
 }
 
 int main(int argc, char **argv) {
-	if (argc < 2) {
-		fprintf(stderr, "Usage: %s prog args\n", argv[0]);
+	if (argc < 3) {
+		fprintf(stderr, "Usage: %s JSON_FILE PROG PROG_ARGS\n", argv[0]);
 		exit(1);
 	}
 
 	pid_t pid = fork();
 	if (pid == 0) {
-		return start_tracee(argc-1, argv+1);
+		return start_tracee(argc-2, argv+2);
 	} else {
-		return main_tracer(pid);
+		return main_tracer(pid, argv[1]);
 	}
 }
 
