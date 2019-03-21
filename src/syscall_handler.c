@@ -8,6 +8,7 @@
 #include <sys/user.h>
 #include <linux/fcntl.h>
 #include <time.h>
+#include <errno.h>
 
 #include "syscall_handler.h"
 #include "syscall_names.h"
@@ -41,9 +42,10 @@ static void read_regs(pid_t tracee) {
 static int read_string(pid_t tracee, unsigned long base, char *dest,
                        const size_t max_len) {
 	for (size_t i = 0; i * 8 < max_len; i++) {
+		errno = 0;
 		long data = ptrace(PTRACE_PEEKDATA, tracee,
 		                   base + (i * sizeof(long)), NULL);
-		if (data == -1) {
+		if (data == -1 && errno != 0) {
 			return -1;
 		}
 		memcpy(dest + (i * sizeof(long)), &data, sizeof(data));
