@@ -76,9 +76,9 @@ static int main_tracer(int pid, char const *json_filename) {
 	// TODO Wait for remaining threads
 	file_stat_print_all();
 	if (print_stats_as_json(file_stat_get_all(), json_filename)) {
-		printf("File statistics were written to %s", json_filename);
+		printf("File statistics were written to %s\n", json_filename);
 	} else {
-		fprintf(stderr, "Error, JSON file could not be created");
+		fprintf(stderr, "Error, JSON file could not be created\n");
 		err = 1;
 	}
 	file_stat_free();
