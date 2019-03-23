@@ -3,6 +3,9 @@
 
 #include "file_statistics.h"
 
+#define MIN_NS_INITIAL 9999999999999U
+#define MIN_BPS_INITIAL 9999999999999.0
+
 
 static GHashTable *stat_table;
 
@@ -10,24 +13,24 @@ static GHashTable *stat_table;
 static void init_file_stat(file_stat *stat) {
 	stat->open_stats.count = 0;
 	stat->open_stats.total_ns = 0;
-	stat->open_stats.min_ns = ULLONG_MAX;
+	stat->open_stats.min_ns = MIN_NS_INITIAL;
 	stat->open_stats.max_ns = 0;
 
 	stat->close_stats.count = 0;
 	stat->close_stats.total_ns = 0;
-	stat->close_stats.min_ns = ULLONG_MAX;
+	stat->close_stats.min_ns = MIN_NS_INITIAL;
 	stat->close_stats.max_ns = 0;
 
 	stat->read_stats.total_b = 0;
 	stat->read_stats.total_ns = 0;
-	stat->read_stats.min_bps = 9999999999999.0;
+	stat->read_stats.min_bps = MIN_BPS_INITIAL;
 	stat->read_stats.max_bps = 0.0;
 	stat->read_stats.blocks = g_hash_table_new_full(g_int_hash, g_int_equal,
 	                                                free, free);
 
 	stat->write_stats.total_b = 0;
 	stat->write_stats.total_ns = 0;
-	stat->write_stats.min_bps = 9999999999999.0;
+	stat->write_stats.min_bps = MIN_BPS_INITIAL;
 	stat->write_stats.max_bps = 0.0;
 	stat->write_stats.blocks = g_hash_table_new_full(g_int_hash, g_int_equal,
 	                                                 free, free);

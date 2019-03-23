@@ -30,7 +30,7 @@ typedef struct {
 } file_stat;
 
 
-void file_stat_init(void); // Handle stdin, stdout, stderr
+void file_stat_init(void);
 
 void file_stat_free(void);
 
