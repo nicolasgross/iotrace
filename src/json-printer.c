@@ -13,9 +13,9 @@ static JsonBuilder *create_builder(GHashTable *stat_table) {
 	json_builder_begin_array(builder);
 
 	// Feed builder with file statistics
-	GHashTableIter iter;
-	gpointer key;
-	gpointer value;
+	GHashTableIter iter, blocks_iter;
+	gpointer key, blocks_key;
+	gpointer value, blocks_value;
 	g_hash_table_iter_init (&iter, stat_table);
 	file_stat *stat;
 	while (g_hash_table_iter_next (&iter, &key, &value)) {
@@ -51,7 +51,18 @@ static JsonBuilder *create_builder(GHashTable *stat_table) {
 		json_builder_add_int_value(builder, stat->read_stats.total_ns);
 		json_builder_add_double_value(builder, stat->read_stats.min_bps);
 		json_builder_add_double_value(builder, stat->read_stats.max_bps);
-		// TODO add block sizes and counts
+		json_builder_end_array(builder);
+
+		// read blocks
+		json_builder_set_member_name(builder, "read-blocks");
+		json_builder_begin_array(builder);
+		g_hash_table_iter_init (&blocks_iter, stat->read_stats.blocks);
+		while (g_hash_table_iter_next (&blocks_iter, &blocks_key, &blocks_value)) {
+			json_builder_begin_array(builder);
+			json_builder_add_int_value(builder, *(ssize_t *) blocks_key);
+			json_builder_add_int_value(builder, *(unsigned long *) blocks_value);
+			json_builder_end_array(builder);
+		}
 		json_builder_end_array(builder);
 
 		// write stats
@@ -61,7 +72,18 @@ static JsonBuilder *create_builder(GHashTable *stat_table) {
 		json_builder_add_int_value(builder, stat->write_stats.total_ns);
 		json_builder_add_double_value(builder, stat->write_stats.min_bps);
 		json_builder_add_double_value(builder, stat->write_stats.max_bps);
-		// TODO add block sizes and counts
+		json_builder_end_array(builder);
+
+		// write blocks
+		json_builder_set_member_name(builder, "write-blocks");
+		json_builder_begin_array(builder);
+		g_hash_table_iter_init (&blocks_iter, stat->write_stats.blocks);
+		while (g_hash_table_iter_next (&blocks_iter, &blocks_key, &blocks_value)) {
+			json_builder_begin_array(builder);
+			json_builder_add_int_value(builder, *(ssize_t *) blocks_key);
+			json_builder_add_int_value(builder, *(unsigned long *) blocks_value);
+			json_builder_end_array(builder);
+		}
 		json_builder_end_array(builder);
 
 		json_builder_end_object(builder);

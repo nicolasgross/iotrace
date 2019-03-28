@@ -120,7 +120,7 @@ static void file_stat_incr_rw(read_write_stat *stat,
 	}
 	unsigned long *count = g_hash_table_lookup(stat->blocks, &bytes);
 	if (count == NULL) {
-		int *key = malloc(sizeof(ssize_t));
+		ssize_t *key = malloc(sizeof(ssize_t));
 		*key = bytes;
 		unsigned long *value = malloc(sizeof(unsigned long));
 		*value = 0;
