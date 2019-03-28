@@ -11,3 +11,8 @@
  */
 bool print_stats_as_json(GHashTable const *stat_table, char const *filename);
 
+/**
+ * Prints information about how the JSON output file is formatted.
+ */
+void print_json_format_info(void);
+

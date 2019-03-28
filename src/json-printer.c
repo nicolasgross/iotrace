@@ -1,6 +1,7 @@
 #include <json-glib/json-glib.h>
 #include <glib-object.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include "file_statistics.h"
 
@@ -111,5 +112,19 @@ bool print_stats_as_json(GHashTable *stat_table, char const *filename) {
 	g_object_unref(builder);
 
 	return success;
+}
+
+void print_json_format_info(void) {
+	printf("JSON data are formatted as follows:\n");
+	printf("open : [ 'count', 'total nanosecs', 'min nanosecs', "
+	       "'max nanosecs' ]\n");
+	printf("close : [ 'count', 'total nanosecs', 'min nanosecs', "
+	       "'max nanosecs' ]\n");
+	printf("read : [ 'total bytes', 'total nanosecs', 'min nanosecs', "
+	       "'max nanosecs' ]\n");
+	printf("read-blocks : [ [ 'number of bytes', 'count' ], ... ]\n");
+	printf("write : [ 'total bytes', 'total nanosecs', 'min nanosecs', "
+	       "'max nanosecs' ]\n");
+	printf("write-blocks : [ [ 'number of bytes', 'count' ], ... ]\n");
 }
 

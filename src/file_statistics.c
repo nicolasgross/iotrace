@@ -190,7 +190,6 @@ void file_stat_print_all(void) {
 			       *(ssize_t *) subvalue);
 		}
 		printf("\n");
-		printf("\n");
 	}
 }
 
