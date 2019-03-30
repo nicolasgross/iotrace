@@ -1,7 +1,7 @@
 #include <glib.h>
 #include <stdio.h>
 
-#include "file_statistics.h"
+#include "file_stats.h"
 
 #define MIN_NS_INITIAL 9999999999999U
 #define MIN_BPS_INITIAL 9999999999999.0
@@ -79,7 +79,7 @@ static file_stat *file_stat_get_safe(char const *filename) {
 	return tmp;
 }
 
-void file_stat_incr_open(char const *filename, unsigned long long time_ns) {
+void file_stat_incr_open(char const *filename, unsigned long long const time_ns) {
 	file_stat *tmp = file_stat_get_safe(filename);
 	tmp->open_stats.count++;
 	tmp->open_stats.total_ns += time_ns;
@@ -91,7 +91,7 @@ void file_stat_incr_open(char const *filename, unsigned long long time_ns) {
 	}
 }
 
-void file_stat_incr_close(char const *filename, unsigned long long time_ns) {
+void file_stat_incr_close(char const *filename, unsigned long long const time_ns) {
 	file_stat *tmp = file_stat_get_safe(filename);
 	tmp->close_stats.count++;
 	tmp->close_stats.total_ns += time_ns;
@@ -103,8 +103,8 @@ void file_stat_incr_close(char const *filename, unsigned long long time_ns) {
 	}
 }
 
-static void file_stat_incr_rw(read_write_stat *stat,
-                              unsigned long long time_ns, ssize_t bytes) {
+static void file_stat_incr_rw(read_write_stat *stat, unsigned long long const time_ns,
+                              ssize_t const bytes) {
 	stat->total_ns += time_ns;
 	if (bytes > 0) {
 		stat->total_b += bytes;
@@ -131,14 +131,14 @@ static void file_stat_incr_rw(read_write_stat *stat,
 
 }
 
-void file_stat_incr_read(char const *filename, unsigned long long time_ns,
-                         ssize_t bytes) {
+void file_stat_incr_read(char const *filename, unsigned long long const time_ns,
+                         ssize_t const bytes) {
 	file_stat *tmp = file_stat_get_safe(filename);
 	file_stat_incr_rw(&tmp->read_stats, time_ns, bytes);
 }
 
-void file_stat_incr_write(char const *filename, unsigned long long time_ns,
-                          ssize_t bytes) {
+void file_stat_incr_write(char const *filename, unsigned long long const time_ns,
+                          ssize_t const bytes) {
 	file_stat *tmp = file_stat_get_safe(filename);
 	file_stat_incr_rw(&tmp->write_stats, time_ns, bytes);
 }

@@ -3,21 +3,14 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "file_statistics.h"
+#include "file_stats.h"
 
 
-static JsonBuilder *create_builder(GHashTable *stat_table) {
-	// Initialize builder
-	JsonBuilder *builder = json_builder_new();
-	json_builder_begin_object(builder);
-	json_builder_set_member_name(builder, "statistics");
-	json_builder_begin_array(builder);
-
-	// Feed builder with file statistics
+static void builder_add_file_stats(JsonBuilder *builder) {
 	GHashTableIter iter, blocks_iter;
 	gpointer key, blocks_key;
 	gpointer value, blocks_value;
-	g_hash_table_iter_init (&iter, stat_table);
+	g_hash_table_iter_init (&iter, file_stat_get_all());
 	file_stat *stat;
 	while (g_hash_table_iter_next (&iter, &key, &value)) {
 		stat = value;
@@ -89,6 +82,21 @@ static JsonBuilder *create_builder(GHashTable *stat_table) {
 
 		json_builder_end_object(builder);
 	}
+}
+
+static void builder_add_syscall_stats(JsonBuilder *builder) {
+	// TODO
+}
+
+static JsonBuilder *create_builder(void) {
+	// Initialize builder
+	JsonBuilder *builder = json_builder_new();
+	json_builder_begin_object(builder);
+	json_builder_set_member_name(builder, "file statistics");
+	json_builder_begin_array(builder);
+
+	builder_add_file_stats(builder);
+	builder_add_syscall_stats(builder);
 
 	// Finalize builder
 	json_builder_end_array(builder);
@@ -96,13 +104,13 @@ static JsonBuilder *create_builder(GHashTable *stat_table) {
 	return builder;
 }
 
-bool print_stats_as_json(GHashTable *stat_table, char const *filename) {
+bool print_stats_as_json(char const *filename) {
 	JsonGenerator *gen = json_generator_new();
 	json_generator_set_indent_char(gen, ' ');
 	json_generator_set_indent(gen, 2);
 	json_generator_set_pretty(gen, true);
 
-	JsonBuilder *builder = create_builder(stat_table);
+	JsonBuilder *builder = create_builder();
 	JsonNode *root = json_builder_get_root(builder);
 	json_generator_set_root(gen, root);
 	bool success = json_generator_to_file(gen, filename, NULL);

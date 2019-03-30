@@ -9,9 +9,10 @@
 #include <stdbool.h>
 
 #include "syscall_handler.h"
-#include "file_statistics.h"
+#include "file_stats.h"
 #include "fd_table.h"
-#include "json-printer.h"
+#include "json_printer.h"
+#include "unmatched_syscalls_stats.h"
 
 
 static bool verbose = false;
@@ -83,12 +84,14 @@ static int start_tracer(pid_t tracee) {
 
 static int main_tracer(int pid, char const *json_filename) {
 	file_stat_init();
+	syscall_stat_init();
 	int err = start_tracer(pid);
 	// TODO Wait for remaining threads
 	if (verbose) {
 		file_stat_print_all();
+		syscall_stat_print_all();
 	}
-	if (print_stats_as_json(file_stat_get_all(), json_filename)) {
+	if (print_stats_as_json(json_filename)) {
 		printf("\nFile statistics were written to '%s'\n", json_filename);
 		printf("Run 'iotrace -f' to get information about the JSON output "
 		       "format\n");
@@ -97,6 +100,7 @@ static int main_tracer(int pid, char const *json_filename) {
 		err = 1;
 	}
 	file_stat_free();
+	syscall_stat_free();
 	return err;
 }
 

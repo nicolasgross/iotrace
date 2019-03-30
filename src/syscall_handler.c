@@ -13,7 +13,7 @@
 #include "syscall_handler.h"
 #include "syscall_names.h"
 #include "fd_table.h"
-#include "file_statistics.h"
+#include "file_stats.h"
 
 #define FILENAME_BUFF_SIZE 256
 
