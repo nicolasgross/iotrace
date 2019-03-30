@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
 	g_option_context_add_main_entries(context, entries, NULL);
 	if (!g_option_context_parse(context, &argc, &argv, &error)) {
 		fprintf(stderr, "Option parsing failed: %s\n", error->message);
-		exit (1);
+		exit(1);
 	} else if (print_format) {
 		print_json_format_info();
 		exit(0);
