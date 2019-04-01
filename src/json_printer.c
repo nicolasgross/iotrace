@@ -4,9 +4,14 @@
 #include <stdio.h>
 
 #include "file_stats.h"
+#include "unmatched_syscalls_stats.h"
+#include "syscall_names.h"
 
 
 static void builder_add_file_stats(JsonBuilder *builder) {
+	json_builder_set_member_name(builder, "file statistics");
+	json_builder_begin_array(builder);
+
 	GHashTableIter iter, blocks_iter;
 	gpointer key, blocks_key;
 	gpointer value, blocks_value;
@@ -82,24 +87,43 @@ static void builder_add_file_stats(JsonBuilder *builder) {
 
 		json_builder_end_object(builder);
 	}
+
+	json_builder_end_array(builder);
 }
 
 static void builder_add_syscall_stats(JsonBuilder *builder) {
-	// TODO
+	json_builder_set_member_name(builder, "unmatched syscalls");
+	json_builder_begin_array(builder);
+
+	GHashTableIter iter;
+	gpointer key;
+	gpointer value;
+	g_hash_table_iter_init(&iter, syscall_stat_get_all());
+
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		syscall_stat *tmp = value;
+		json_builder_begin_object(builder);
+		json_builder_set_member_name(builder, "syscall");
+		json_builder_add_string_value(builder, syscall_names[*(int *) key]);
+		json_builder_set_member_name(builder, "count");
+		json_builder_add_int_value(builder, tmp->count);
+		json_builder_set_member_name(builder, "total ns");
+		json_builder_add_int_value(builder, tmp->total_ns);
+		json_builder_end_object(builder);
+	}
+
+	json_builder_end_array(builder);
 }
 
 static JsonBuilder *create_builder(void) {
 	// Initialize builder
 	JsonBuilder *builder = json_builder_new();
 	json_builder_begin_object(builder);
-	json_builder_set_member_name(builder, "file statistics");
-	json_builder_begin_array(builder);
 
 	builder_add_file_stats(builder);
 	builder_add_syscall_stats(builder);
 
 	// Finalize builder
-	json_builder_end_array(builder);
 	json_builder_end_object(builder);
 	return builder;
 }
@@ -123,7 +147,6 @@ bool print_stats_as_json(char const *filename) {
 }
 
 void print_json_format_info(void) {
-	// TODO adjust to unmatched syscall stats
 	printf("JSON data are formatted as follows:\n");
 	printf("open : [ 'count', 'total nanosecs', 'min nanosecs', "
 	       "'max nanosecs' ]\n");
