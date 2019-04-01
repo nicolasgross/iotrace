@@ -144,6 +144,8 @@ void file_stat_incr_write(char const *filename, unsigned long long const time_ns
 }
 
 void file_stat_print_all(void) {
+	printf("FILE STATISTICS:\n\n");
+
 	GHashTableIter iter;
 	gpointer key;
 	gpointer value;
@@ -191,5 +193,6 @@ void file_stat_print_all(void) {
 		}
 		printf("\n");
 	}
+	printf("\n");
 }
 

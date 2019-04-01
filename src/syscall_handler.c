@@ -14,6 +14,7 @@
 #include "syscall_names.h"
 #include "fd_table.h"
 #include "file_stats.h"
+#include "unmatched_syscalls_stats.h"
 
 #define FILENAME_BUFF_SIZE 256
 
@@ -29,6 +30,7 @@
 static struct user_regs_struct regs;
 static struct timespec start_time;
 static int fd;
+static int sc;
 static char filename_buffer[FILENAME_BUFF_SIZE];
 
 
@@ -130,8 +132,7 @@ static void handle_close_return(fd_table table) {
 		fprintf(stderr, "%s", "Error while reading end time of close");
 		exit(1);
 	}
-	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
-	                                                &current_time);
+	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
 	char const *filename = fd_table_lookup(table, fd);
 	if (filename == NULL) {
 		filename = "NULL";
@@ -156,8 +157,7 @@ static void handle_read_return(pid_t tracee, fd_table table) {
 		fprintf(stderr, "%s", "Error while reading end time of read");
 		exit(1);
 	}
-	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
-	                                                &current_time);
+	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	char const *filename = fd_table_lookup(table, fd);
 	if (filename == NULL) {
@@ -183,8 +183,7 @@ static void handle_write_return(pid_t tracee, fd_table table) {
 		fprintf(stderr, "%s", "Error while reading end time of write");
 		exit(1);
 	}
-	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
-	                                                &current_time);
+	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	char const *filename = fd_table_lookup(table, fd);
 	if (filename == NULL) {
@@ -203,16 +202,27 @@ static void handle_write_return(pid_t tracee, fd_table table) {
 // ---- pipe ----
 
 
-// TODO unmatched
 // ---- unmatched ----
 
-//static void handle_unmatched_call(pid_t tracee, int syscall) {
-//	printf("%s(...) = ", syscall_names[syscall]);
-//}
+static void handle_unmatched_call(int syscall) {
+	sc = syscall;
+	if (clock_gettime(USED_CLOCK, &start_time)) {
+		fprintf(stderr, "%s", "Error while reading start time of unmatched "
+		        "syscall");
+		exit(1);
+	}
+}
 
-//static void handle_unmatched_return(pid_t tracee) {
-//	printf("%d\n", (int) get_retval(tracee));
-//}
+static void handle_unmatched_return(void) {
+	struct timespec current_time;
+	if (clock_gettime(USED_CLOCK, &current_time)) {
+		fprintf(stderr, "%s", "Error while reading end time of unmatched "
+		        "syscall");
+		exit(1);
+	}
+	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
+	syscall_stat_incr(sc, elapsed_ns);
+}
 
 
 void handle_syscall_call(pid_t tracee, int syscall) {
@@ -232,9 +242,9 @@ void handle_syscall_call(pid_t tracee, int syscall) {
 		case SYS_write:
 			handle_write_call(tracee);
 			break;
-//		default:
-//			handle_unmatched_call(tracee, syscall);
-//			break;
+		default:
+			handle_unmatched_call(syscall);
+			break;
 	}
 }
 
@@ -255,9 +265,9 @@ void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
 		case SYS_write:
 			handle_write_return(tracee, table);
 			break;
-//		default:
-//			handle_unmatched_return(tracee);
-//			break;
+		default:
+			handle_unmatched_return();
+			break;
 	}
 }
 

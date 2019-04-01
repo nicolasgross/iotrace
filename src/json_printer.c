@@ -123,6 +123,7 @@ bool print_stats_as_json(char const *filename) {
 }
 
 void print_json_format_info(void) {
+	// TODO adjust to unmatched syscall stats
 	printf("JSON data are formatted as follows:\n");
 	printf("open : [ 'count', 'total nanosecs', 'min nanosecs', "
 	       "'max nanosecs' ]\n");

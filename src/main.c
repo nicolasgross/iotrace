@@ -7,6 +7,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <glib.h>
 
 #include "syscall_handler.h"
 #include "file_stats.h"
@@ -87,12 +88,13 @@ static int main_tracer(int pid, char const *json_filename) {
 	syscall_stat_init();
 	int err = start_tracer(pid);
 	// TODO Wait for remaining threads
+	printf("\n");
 	if (verbose) {
 		file_stat_print_all();
 		syscall_stat_print_all();
 	}
 	if (print_stats_as_json(json_filename)) {
-		printf("\nFile statistics were written to '%s'\n", json_filename);
+		printf("File statistics were written to '%s'\n", json_filename);
 		printf("Run 'iotrace -f' to get information about the JSON output "
 		       "format\n");
 	} else {

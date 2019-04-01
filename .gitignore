@@ -1,5 +1,6 @@
 build/
 .idea/
+compile_commands.json
 
 # Prerequisites
 *.d

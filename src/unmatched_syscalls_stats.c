@@ -1,6 +1,8 @@
 #include <glib.h>
+#include <stdio.h>
 
 #include "unmatched_syscalls_stats.h"
+#include "syscall_names.h"
 
 
 static GHashTable *syscall_table;
@@ -42,6 +44,18 @@ void syscall_stat_incr(int const syscall, unsigned long long const time_ns) {
 }
 
 void syscall_stat_print_all(void) {
-	// TODO
+	printf("UNMATCHED SYSCALLS:\n\n");
+
+	GHashTableIter iter;
+	gpointer key;
+	gpointer value;
+	g_hash_table_iter_init (&iter, syscall_table);
+
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		syscall_stat *tmp = value;
+		printf("%s  ->  count: %llu, total: %llu ns\n",
+		       syscall_names[*(int *) key], tmp->count, tmp->total_ns);
+	}
+	printf("\n");
 }
 
