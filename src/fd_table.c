@@ -8,8 +8,8 @@
 
 
 fd_table fd_table_create(void) {
-	GHashTable *table = g_hash_table_new_full(g_int_hash,
-	                                          g_int_equal, free, free);
+	GHashTable *table = g_hash_table_new_full(g_int_hash, g_int_equal, free,
+	                                          free);
 	// Add stdin, stdout, stderr to table, because they are initially open.
 	fd_table_insert(table, 0, "stdin");
 	fd_table_insert(table, 1, "stdout");
@@ -17,13 +17,18 @@ fd_table fd_table_create(void) {
 	return table;
 }
 
-void fd_table_insert(fd_table table, int fd, char *filename) {
+void fd_table_insert(fd_table table, int fd, char const *filename) {
 	size_t len = strlen(filename);
 	char *name_mem = malloc(sizeof(char) * (len + 1));
 	strcpy(name_mem, filename);
 	int *fd_mem = malloc(sizeof(int));
 	*fd_mem = fd;
 	g_hash_table_insert(table, (gpointer) fd_mem, (gpointer) name_mem);
+}
+
+void fd_table_insert_dup(fd_table table, int orig_fd, int dup_fd) {
+	char const *filename = fd_table_lookup(table, orig_fd);
+	fd_table_insert(table, dup_fd, filename);
 }
 
 bool fd_table_remove(fd_table table, int fd) {

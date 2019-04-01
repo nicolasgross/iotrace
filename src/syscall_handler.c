@@ -27,19 +27,11 @@
 #endif
 
 
-static struct user_regs_struct regs;
 static struct timespec start_time;
 static int fd;
 static int sc;
 static char filename_buffer[FILENAME_BUFF_SIZE];
 
-
-static void read_regs(pid_t tracee) {
-	if (ptrace(PTRACE_GETREGS, tracee, NULL, &regs)) {
-		fprintf(stderr, "%s", "Error while reading register values");
-		exit(1);
-	}
-}
 
 static int read_string(pid_t tracee, unsigned long base, char *dest,
                        const size_t max_len) {
@@ -91,10 +83,9 @@ static void handle_open_return(pid_t tracee, fd_table table) {
 		fprintf(stderr, "%s", "Error while reading end time of open/openat");
 		exit(1);
 	}
-	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time,
-	                                                &current_time);
+	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	if (fd >=0) {
+	if (fd >= 0) {
 		fd_table_insert(table, ret_fd, filename_buffer);
 	}
 	file_stat_incr_open(filename_buffer, elapsed_ns);
@@ -193,9 +184,24 @@ static void handle_write_return(pid_t tracee, fd_table table) {
 }
 
 
+// ---- dup/dup2/dup3 ----
+
+static void handle_dup_call(pid_t tracee) {
+	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+}
+
+static void handle_dup_return(pid_t tracee, fd_table table) {
+	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	if (fd >= 0) {
+		fd_table_insert_dup(table, fd, ret_fd);
+	}
+	// TODO Should count and times for dup be added to file statistics?
+	// Or is it neglectible/uninteresting?
+}
+
+
 // TODO later:
 // ---- execve ----
-// ---- dup2 ----
 // ---- eventfd2 ----
 // ---- socket ----
 // ---- socketpair ----
@@ -242,6 +248,11 @@ void handle_syscall_call(pid_t tracee, int syscall) {
 		case SYS_write:
 			handle_write_call(tracee);
 			break;
+		case SYS_dup:
+		case SYS_dup2:
+		case SYS_dup3:
+			handle_dup_call(tracee);
+			break;
 		default:
 			handle_unmatched_call(syscall);
 			break;
@@ -264,6 +275,11 @@ void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
 			break;
 		case SYS_write:
 			handle_write_return(tracee, table);
+			break;
+		case SYS_dup:
+		case SYS_dup2:
+		case SYS_dup3:
+			handle_dup_return(tracee, table);
 			break;
 		default:
 			handle_unmatched_return();

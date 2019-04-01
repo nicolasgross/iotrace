@@ -21,7 +21,16 @@ fd_table fd_table_create(void);
  * @param fd the file descriptor.
  * @param filename the filename.
  */
-void fd_table_insert(fd_table table, int fd, char *filename);
+void fd_table_insert(fd_table table, int fd, char const *filename);
+
+/**
+ * Inserts a duplicate into the table.
+ *
+ * @param table the mapping table.
+ * @param orig_fd the original file descriptor.
+ * @param dup_fd the new duplicate file descriptor.
+ */
+void fd_table_insert_dup(fd_table table, int orig_fd, int dup_fd);
 
 /**
  * Removes a file descriptor and its corresponding file name from the table.
