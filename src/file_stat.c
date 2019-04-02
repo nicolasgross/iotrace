@@ -1,7 +1,7 @@
 #include <glib.h>
 #include <stdio.h>
 
-#include "file_stats.h"
+#include "file_stat.h"
 
 #define MIN_NS_INITIAL 9999999999999U
 #define MIN_BPS_INITIAL 9999999999999.0

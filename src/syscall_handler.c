@@ -13,8 +13,8 @@
 #include "syscall_handler.h"
 #include "syscall_names.h"
 #include "fd_table.h"
-#include "file_stats.h"
-#include "unmatched_syscalls_stats.h"
+#include "file_stat.h"
+#include "unconsidered_syscall_stat.h"
 
 #define FILENAME_BUFF_SIZE 256
 #define NANOS 1000000000LL
@@ -201,8 +201,12 @@ static void handle_dup_return(pid_t tracee, fd_table table) {
 }
 
 
+// ---- fcntl ----
+// TODO F_DUPFD FD_CLOEXEC
+
+
+
 // TODO later:
-// ---- clone ----
 // ---- execve ----
 // ---- eventfd2 ----
 // ---- socket ----
@@ -210,9 +214,10 @@ static void handle_dup_return(pid_t tracee, fd_table table) {
 // ---- pipe ----
 
 
-// ---- unmatched ----
+// ---- keep also track of time spent in syscalls  ----
+// ---- that are not considered in file statistics ----
 
-static void handle_unmatched_call(int syscall) {
+static void handle_unconsidered_call(int syscall) {
 	sc = syscall;
 	if (clock_gettime(USED_CLOCK, &start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of unmatched "
@@ -221,7 +226,7 @@ static void handle_unmatched_call(int syscall) {
 	}
 }
 
-static void handle_unmatched_return(void) {
+static void handle_unconsidered_return(void) {
 	struct timespec current_time;
 	if (clock_gettime(USED_CLOCK, &current_time)) {
 		fprintf(stderr, "%s", "Error while reading end time of unmatched "
@@ -235,6 +240,7 @@ static void handle_unmatched_return(void) {
 
 void handle_syscall_call(pid_t tracee, int syscall) {
 	switch(syscall) {
+		// file statistics
 		case SYS_open:
 			handle_open_call(tracee);
 			break;
@@ -250,19 +256,22 @@ void handle_syscall_call(pid_t tracee, int syscall) {
 		case SYS_write:
 			handle_write_call(tracee);
 			break;
+
+		// house keeping
 		case SYS_dup:
 		case SYS_dup2:
 		case SYS_dup3:
 			handle_dup_call(tracee);
-			break;
+			__attribute__ ((fallthrough));
 		default:
-			handle_unmatched_call(syscall);
+			handle_unconsidered_call(syscall);
 			break;
 	}
 }
 
 void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
 	switch(syscall) {
+		// file statistics
 		case SYS_open:
 			handle_open_return(tracee, table);
 			break;
@@ -278,13 +287,15 @@ void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
 		case SYS_write:
 			handle_write_return(tracee, table);
 			break;
+
+		// house keeping
+		default:
+			handle_unconsidered_return();
+			__attribute__ ((fallthrough));
 		case SYS_dup:
 		case SYS_dup2:
 		case SYS_dup3:
 			handle_dup_return(tracee, table);
-			break;
-		default:
-			handle_unmatched_return();
 			break;
 	}
 }

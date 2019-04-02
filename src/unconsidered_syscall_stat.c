@@ -1,7 +1,7 @@
 #include <glib.h>
 #include <stdio.h>
 
-#include "unmatched_syscalls_stats.h"
+#include "unconsidered_syscall_stat.h"
 #include "syscall_names.h"
 
 
@@ -44,7 +44,7 @@ void syscall_stat_incr(int const syscall, unsigned long long const time_ns) {
 }
 
 void syscall_stat_print_all(void) {
-	printf("UNMATCHED SYSCALLS:\n\n");
+	printf("UNCONSIDERED SYSCALLS IN FILE STATISTICS:\n\n");
 
 	GHashTableIter iter;
 	gpointer key;

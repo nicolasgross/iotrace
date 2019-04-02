@@ -3,8 +3,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "file_stats.h"
-#include "unmatched_syscalls_stats.h"
+#include "file_stat.h"
+#include "unconsidered_syscall_stat.h"
 #include "syscall_names.h"
 
 

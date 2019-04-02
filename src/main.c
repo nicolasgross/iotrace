@@ -10,10 +10,10 @@
 #include <glib.h>
 
 #include "syscall_handler.h"
-#include "file_stats.h"
+#include "file_stat.h"
 #include "fd_table.h"
 #include "json_printer.h"
-#include "unmatched_syscalls_stats.h"
+#include "unconsidered_syscall_stat.h"
 
 
 static bool verbose = false;
@@ -46,6 +46,7 @@ static pid_t wait_for_syscall(pid_t last_stopped) {
 		// TODO handle PID of forked/vforked/cloned process and create new
 		// thread that runs 'start_tracer'
 		if (new_stopped == -1 || WIFEXITED(status)) {
+			// TODO check whether last tracer, only exit if true
 			// error or tracee exited
 			return -1;
 		}
@@ -54,6 +55,7 @@ static pid_t wait_for_syscall(pid_t last_stopped) {
 }
 
 static int start_tracer(pid_t tracee) {
+	// TODO one fd_table per child
 	fd_table table = fd_table_create();
 	int status;
 	int syscall;
