@@ -33,48 +33,52 @@ static int start_tracee(int argc, char **argv) {
 	return execvp(args[0], args);
 }
 
-static int wait_for_syscall(pid_t tracee) {
+static pid_t wait_for_syscall(pid_t last_stopped) {
 	int status;
+	pid_t new_stopped;
+	ptrace(PTRACE_SYSCALL, last_stopped, NULL, NULL);
 	while (1) {
-		ptrace(PTRACE_SYSCALL, tracee, 0, 0); // run until syscall
-		waitpid(tracee, &status, __WALL);
+		new_stopped = waitpid(-1, &status, __WALL);
 		if (WIFSTOPPED(status) && WSTOPSIG(status) & 0x80) {
 			// stopped by a syscall
-			return 0;
+			return new_stopped;
 		}
 		// TODO handle PID of forked/vforked/cloned process and create new
 		// thread that runs 'start_tracer'
-		if (WIFEXITED(status)) {
-			// tracee exited
-			return 1;
+		if (new_stopped == -1 || WIFEXITED(status)) {
+			// error or tracee exited
+			return -1;
 		}
-    }
+		ptrace(PTRACE_SYSCALL, new_stopped, NULL, NULL);
+	}
 }
 
 static int start_tracer(pid_t tracee) {
 	fd_table table = fd_table_create();
 	int status;
 	int syscall;
+	pid_t stopped_child = tracee;
 	waitpid(tracee, &status, 0); // wait for notification
-	ptrace(PTRACE_SETOPTIONS, tracee, 0,
+	ptrace(PTRACE_SETOPTIONS, tracee, NULL,
 	       PTRACE_O_TRACESYSGOOD | // get syscall info
-//	       PTRACE_O_TRACECLONE | // trace cloned processes
-//	       PTRACE_O_TRACEFORK | // trace forked processes
-//	       PTRACE_O_TRACEVFORK | // trace vforked processes
+	       PTRACE_O_TRACECLONE | // trace cloned processes
+	       PTRACE_O_TRACEFORK | // trace forked processes
+	       PTRACE_O_TRACEVFORK | // trace vforked processes
 	       PTRACE_O_EXITKILL); // send SIGKILL to tracee if tracer exits
-	while(1) {
-		if (wait_for_syscall(tracee) != 0) {
-			break;
-		}
+	while (1) {
 		// syscall call
-		syscall = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
-		handle_syscall_call(tracee, syscall);
-
-		if (wait_for_syscall(tracee) != 0) {
+		if ((stopped_child = wait_for_syscall(stopped_child)) == -1) {
 			break;
 		}
+		syscall = (int) ptrace(PTRACE_PEEKUSER, stopped_child,
+		                       sizeof(long) * ORIG_RAX);
+		handle_syscall_call(stopped_child, syscall);
+
 		// syscall return
-		handle_syscall_return(tracee, table, syscall);
+		if ((stopped_child = wait_for_syscall(stopped_child)) == -1) {
+			break;
+		}
+		handle_syscall_return(stopped_child, table, syscall);
 	}
 	fd_table_free(table);
 	return 0;
