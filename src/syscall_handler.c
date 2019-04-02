@@ -220,7 +220,7 @@ static void handle_dup_return(pid_t tracee, fd_table table) {
 static void handle_unconsidered_call(int syscall) {
 	sc = syscall;
 	if (clock_gettime(USED_CLOCK, &start_time)) {
-		fprintf(stderr, "%s", "Error while reading start time of unmatched "
+		fprintf(stderr, "%s", "Error while reading start time of unconsidered "
 		        "syscall");
 		exit(1);
 	}
@@ -229,7 +229,7 @@ static void handle_unconsidered_call(int syscall) {
 static void handle_unconsidered_return(void) {
 	struct timespec current_time;
 	if (clock_gettime(USED_CLOCK, &current_time)) {
-		fprintf(stderr, "%s", "Error while reading end time of unmatched "
+		fprintf(stderr, "%s", "Error while reading end time of unconsidered "
 		        "syscall");
 		exit(1);
 	}

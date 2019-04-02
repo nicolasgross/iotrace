@@ -11,8 +11,6 @@ pkg_check_modules(JSON_GLIB REQUIRED json-glib-1.0)
 pkg_check_modules(GOBJECT REQUIRED gobject-2.0)
 
 # Copied from: https://github.com/darktable-org/darktable/blob/ae01e8f9f9ec14572930317fdf0cacc614300837/cmake/modules/FindJsonGlib.cmake#L13
-#  |
-#  v
 find_path(JSONGLIB_INCLUDE_DIRS
 	NAMES json-glib/json-glib.h
 	HINTS ${JSONGLIB_PKGCONF_INCLUDE_DIRS}
