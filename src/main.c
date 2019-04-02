@@ -92,7 +92,7 @@ static int main_tracer(int pid, char const *json_filename) {
 	}
 	if (print_stats_as_json(json_filename)) {
 		printf("File statistics were written to '%s'\n", json_filename);
-		printf("Run 'iotrace -f' to get information about the JSON output "
+		printf("Run 'iotrace --help' to get information about the JSON output "
 		       "format\n");
 	} else {
 		fprintf(stderr, "\nError, JSON file could not be created\n");
