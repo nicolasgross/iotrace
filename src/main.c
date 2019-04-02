@@ -20,8 +20,8 @@ static bool verbose = false;
 static bool print_format = false;
 static GOptionEntry entries[] = {
 	{ "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose, "Be verbose", NULL },
-	{ "format", 'f', 0, G_OPTION_ARG_NONE, &print_format, "Show information "
-	  "about output format", NULL },
+	{ "json-format", 'j', 0, G_OPTION_ARG_NONE, &print_format,
+	  "Show information about JSON output format", NULL },
 	{ NULL }
 };
 
@@ -60,10 +60,10 @@ static int start_tracer(pid_t tracee) {
 	int syscall;
 	waitpid(tracee, &status, 0); // wait for notification
 	ptrace(PTRACE_SETOPTIONS, tracee, 0,
-	       PTRACE_O_TRACECLONE | // trace cloned processes
-	       PTRACE_O_TRACEFORK | // trace forked processes
-	       PTRACE_O_TRACEVFORK | // trace vforked processes
 	       PTRACE_O_TRACESYSGOOD | // get syscall info
+//	       PTRACE_O_TRACECLONE | // trace cloned processes
+//	       PTRACE_O_TRACEFORK | // trace forked processes
+//	       PTRACE_O_TRACEVFORK | // trace vforked processes
 	       PTRACE_O_EXITKILL); // send SIGKILL to tracee if tracer exits
 	while(1) {
 		if (wait_for_syscall(tracee) != 0) {
@@ -117,6 +117,7 @@ int main(int argc, char **argv) {
 			"The argument OUTPUT_FILE is the location of the JSON output "
 			"file, PROG is the program that should be analyzed and "
 			"[PROG_ARGS\u2026] are its arguments.");
+	g_option_context_set_strict_posix(context, true);
 	g_option_context_add_main_entries(context, entries, NULL);
 	if (!g_option_context_parse(context, &argc, &argv, &error)) {
 		fprintf(stderr, "Option parsing failed: %s\n", error->message);
