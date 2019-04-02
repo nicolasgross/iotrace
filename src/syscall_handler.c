@@ -17,6 +17,7 @@
 #include "unmatched_syscalls_stats.h"
 
 #define FILENAME_BUFF_SIZE 256
+#define NANOS 1000000000LL
 
 #ifdef CLOCK_MONOTONIC_RAW
 	#define USED_CLOCK CLOCK_MONOTONIC_RAW
@@ -55,9 +56,9 @@ static int read_string(pid_t tracee, unsigned long base, char *dest,
 
 static unsigned long long calc_elapsed_ns(struct timespec *start_time,
                                           struct timespec *current_time) {
-	unsigned long long start_ns = start_time->tv_sec * 1000000000LL +
+	unsigned long long start_ns = start_time->tv_sec * NANOS +
 	                              start_time->tv_nsec;
-	unsigned long long current_ns = current_time->tv_sec * 1000000000LL +
+	unsigned long long current_ns = current_time->tv_sec * NANOS +
 	                                current_time->tv_nsec;
 	return current_ns - start_ns;
 }
