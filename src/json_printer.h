@@ -13,11 +13,6 @@
  */
 bool print_stats_as_json(char const *filename);
 
-/**
- * Prints information about how the JSON output file is formatted.
- */
-void print_json_format_info(void);
-
 
 #endif
 

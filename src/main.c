@@ -17,11 +17,8 @@
 
 
 static bool verbose = false;
-static bool print_format = false;
 static GOptionEntry entries[] = {
 	{ "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose, "Be verbose", NULL },
-	{ "json-format", 'j', 0, G_OPTION_ARG_NONE, &print_format,
-	  "Show information about JSON output format", NULL },
 	{ NULL }
 };
 
@@ -110,21 +107,30 @@ int main(int argc, char **argv) {
 	GError *error = NULL;
 	GOptionContext *context;
 
-	context = g_option_context_new("OUTPUT_FILE PROG [PROG_ARGS\u2026]");
+	context = g_option_context_new("OUTPUT_FILE PROG [PROG_ARG\u2026]");
 	g_option_context_set_summary(context, "Analyzes the I/O behavior of a "
 			"program and prints the results to a JSON file. The analysis "
 			"comprises ... TBD ...\n" // TODO explain full functionality
 			"The argument OUTPUT_FILE is the location of the JSON output "
 			"file, PROG is the program that should be analyzed and "
-			"[PROG_ARGS\u2026] are its arguments.");
+			"[PROG_ARG\u2026] are its arguments.\n"
+			"\n"
+			"The JSON output is formatted as follows:\n"
+			"open : [ 'count', 'total nanosecs', 'min nanosecs', "
+			"'max nanosecs' ]\n"
+			"close : [ 'count', 'total nanosecs', 'min nanosecs', "
+			"'max nanosecs' ]\n"
+			"read : [ 'total bytes', 'total nanosecs', 'min nanosecs', "
+			"'max nanosecs' ]\n"
+			"read-blocks : [ [ 'number of bytes', 'count' ], ... ]\n"
+			"write : [ 'total bytes', 'total nanosecs', 'min nanosecs', "
+			"'max nanosecs' ]\n"
+			"write-blocks : [ [ 'number of bytes', 'count' ], ... ]\n");
 	g_option_context_set_strict_posix(context, true);
 	g_option_context_add_main_entries(context, entries, NULL);
 	if (!g_option_context_parse(context, &argc, &argv, &error)) {
 		fprintf(stderr, "Option parsing failed: %s\n", error->message);
 		exit(1);
-	} else if (print_format) {
-		print_json_format_info();
-		exit(0);
 	} else if (argc < 3) {
 		printf("%s", g_option_context_get_help(context, FALSE, NULL));
 		exit(1);
