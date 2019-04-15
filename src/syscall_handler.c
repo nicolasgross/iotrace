@@ -212,8 +212,13 @@ static void handle_dup_return(pid_t tracee) {
 
 
 // ---- fcntl ----
-// TODO F_DUPFD FD_CLOEXEC
 
+static void handle_fcntl_call(pid_t tracee) {
+// TODO F_DUPFD FD_CLOEXEC
+}
+
+static void handle_fcntl_return(pid_t tracee) {
+}
 
 
 // TODO later:
@@ -251,63 +256,69 @@ static void handle_unconsidered_return(void) {
 
 
 void handle_syscall_call(pid_t tracee, int syscall) {
-	switch(syscall) {
-		// file statistics
+	// file statistics
+	switch (syscall) {
 		case SYS_open:
 			handle_open_call(tracee);
-			break;
+			return;
 		case SYS_openat:
 			handle_openat_call(tracee);
-			break;
+			return;
 		case SYS_close:
 			handle_close_call(tracee);
-			break;
+			return;
 		case SYS_read:
 			handle_read_call(tracee);
-			break;
+			return;
 		case SYS_write:
 			handle_write_call(tracee);
-			break;
+			return;
+	}
 
-		// house keeping
+	// unconsidered syscalls
+	switch (syscall) {
 		case SYS_dup:
 		case SYS_dup2:
 		case SYS_dup3:
 			handle_dup_call(tracee);
-			__attribute__ ((fallthrough));
-		default:
-			handle_unconsidered_call(syscall);
+			break;
+		case SYS_fcntl:
+			handle_fcntl_call(tracee);
 			break;
 	}
+	handle_unconsidered_call(syscall);
 }
 
 void handle_syscall_return(pid_t tracee, int syscall) {
-	switch(syscall) {
+	switch (syscall) {
 		// file statistics
 		case SYS_open:
 			handle_open_return(tracee);
-			break;
+			return;
 		case SYS_openat:
 			handle_open_return(tracee);
-			break;
+			return;
 		case SYS_close:
 			handle_close_return();
-			break;
+			return;
 		case SYS_read:
 			handle_read_return(tracee);
-			break;
+			return;
 		case SYS_write:
 			handle_write_return(tracee);
-			break;
+			return;
+	}
 
-		// house keeping
-		default:
-			handle_unconsidered_return();
-			__attribute__ ((fallthrough));
+	// unconsidered syscalls
+	handle_unconsidered_return();
+	switch (syscall) {
 		case SYS_dup:
 		case SYS_dup2:
 		case SYS_dup3:
 			handle_dup_return(tracee);
+			break;
+		case SYS_fcntl:
+			handle_fcntl_return(tracee);
 			break;
 	}
 }
