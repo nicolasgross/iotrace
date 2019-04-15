@@ -26,5 +26,7 @@ target_include_directories(iotrace PRIVATE ${GLIB_INCLUDE_DIRS}
 	${JSONGLIB_INCLUDE_DIRS})
 target_link_libraries(iotrace glib-2.0 json-glib-1.0 gobject-2.0)
 
-add_executable(diskio_example test test/diskio_example.c)
+add_executable(diskio test test/diskio.c)
+
+add_executable(dup test test/dup.c)
 
