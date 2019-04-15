@@ -8,6 +8,7 @@
 
 
 static GHashTable *stat_table;
+static GMutex stats_mutex;
 
 
 static void init_file_stat(file_stat *stat) {
@@ -42,7 +43,9 @@ static void stat_table_insert(char const *filename) {
 	strcpy(name_mem, filename);
 	file_stat *stat_mem = malloc(sizeof(file_stat));
 	init_file_stat(stat_mem);
+	g_mutex_lock(&stats_mutex);
 	g_hash_table_insert(stat_table, name_mem, stat_mem);
+	g_mutex_unlock(&stats_mutex);
 }
 
 static void free_single_file_stat(gpointer stat) {
@@ -80,6 +83,7 @@ static file_stat *file_stat_get_safe(char const *filename) {
 }
 
 void file_stat_incr_open(char const *filename, unsigned long long const time_ns) {
+	g_mutex_lock(&stats_mutex);
 	file_stat *tmp = file_stat_get_safe(filename);
 	tmp->open_stats.count++;
 	tmp->open_stats.total_ns += time_ns;
@@ -89,9 +93,11 @@ void file_stat_incr_open(char const *filename, unsigned long long const time_ns)
 	if (tmp->open_stats.max_ns < time_ns) {
 		tmp->open_stats.max_ns = time_ns;
 	}
+	g_mutex_unlock(&stats_mutex);
 }
 
 void file_stat_incr_close(char const *filename, unsigned long long const time_ns) {
+	g_mutex_lock(&stats_mutex);
 	file_stat *tmp = file_stat_get_safe(filename);
 	tmp->close_stats.count++;
 	tmp->close_stats.total_ns += time_ns;
@@ -101,6 +107,7 @@ void file_stat_incr_close(char const *filename, unsigned long long const time_ns
 	if (tmp->close_stats.max_ns < time_ns) {
 		tmp->close_stats.max_ns = time_ns;
 	}
+	g_mutex_unlock(&stats_mutex);
 }
 
 static void file_stat_incr_rw(read_write_stat *stat, unsigned long long const time_ns,
@@ -118,6 +125,7 @@ static void file_stat_incr_rw(read_write_stat *stat, unsigned long long const ti
 			stat->max_bps = bps;
 		}
 	}
+	g_mutex_lock(&stats_mutex);
 	unsigned long *count = g_hash_table_lookup(stat->blocks, &bytes);
 	if (count == NULL) {
 		ssize_t *key = malloc(sizeof(ssize_t));
@@ -128,19 +136,23 @@ static void file_stat_incr_rw(read_write_stat *stat, unsigned long long const ti
 		count = value;
 	}
 	*count += 1;
-
+	g_mutex_unlock(&stats_mutex);
 }
 
 void file_stat_incr_read(char const *filename, unsigned long long const time_ns,
                          ssize_t const bytes) {
+	g_mutex_lock(&stats_mutex);
 	file_stat *tmp = file_stat_get_safe(filename);
 	file_stat_incr_rw(&tmp->read_stats, time_ns, bytes);
+	g_mutex_unlock(&stats_mutex);
 }
 
 void file_stat_incr_write(char const *filename, unsigned long long const time_ns,
                           ssize_t const bytes) {
+	g_mutex_lock(&stats_mutex);
 	file_stat *tmp = file_stat_get_safe(filename);
 	file_stat_incr_rw(&tmp->write_stats, time_ns, bytes);
+	g_mutex_unlock(&stats_mutex);
 }
 
 void file_stat_print_all(void) {
