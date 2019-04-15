@@ -10,6 +10,15 @@
 static GHashTable *fd_table;
 static GMutex fd_mutex;
 
+
+void fd_table_lock(void) {
+	g_mutex_lock(&fd_mutex);
+}
+
+void fd_table_unlock(void) {
+	g_mutex_unlock(&fd_mutex);
+}
+
 void fd_table_init(void) {
 	fd_table = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
 	// Add stdin, stdout, stderr to table, because they are initially open.
@@ -18,7 +27,7 @@ void fd_table_init(void) {
 	fd_table_insert(2, "stderr");
 }
 
-void fd_table_insert(int fd, char const *filename) {
+static void fd_table_insert_intern(int fd, char const *filename) {
 	size_t len = strlen(filename);
 	char *name_mem = malloc(sizeof(char) * (len + 1));
 	strcpy(name_mem, filename);
@@ -27,9 +36,17 @@ void fd_table_insert(int fd, char const *filename) {
 	g_hash_table_insert(fd_table, (gpointer) fd_mem, (gpointer) name_mem);
 }
 
+void fd_table_insert(int fd, char const *filename) {
+	g_mutex_lock(&fd_mutex);
+	fd_table_insert_intern(fd, filename);
+	g_mutex_unlock(&fd_mutex);
+}
+
 void fd_table_insert_dup(int orig_fd, int dup_fd) {
-	char const *filename = fd_table_lookup(fd_table, orig_fd);
-	fd_table_insert(fd_table, dup_fd, filename);
+	g_mutex_lock(&fd_mutex);
+	char const *filename = fd_table_lookup(orig_fd);
+	fd_table_insert_intern(dup_fd, filename);
+	g_mutex_unlock(&fd_mutex);
 }
 
 bool fd_table_remove(int fd) {

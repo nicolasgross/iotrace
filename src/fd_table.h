@@ -6,6 +6,18 @@
 
 
 /**
+ * Lock the mutex for the file descriptor table.
+ *
+ */
+void fd_table_lock(void);
+
+/**
+ * Unlock the mutex for the file descriptor table.
+ *
+ */
+void fd_table_unlock(void);
+
+/**
  * Initalizes the table that maps file descriptors to filenames.
  *
  */
@@ -36,7 +48,8 @@ void fd_table_insert_dup(int orig_fd, int dup_fd);
 bool fd_table_remove(int fd);
 
 /**
- * Returns the filename of a file descriptor.
+ * Returns the filename of a file descriptor. The caller must lock/unlock the
+ * file descriptor table manually while working with the returned filename.
  *
  * @param fd the file descriptor.
  * @return the filename, can be NULL if no mapping exists.

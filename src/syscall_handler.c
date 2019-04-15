@@ -126,11 +126,13 @@ static void handle_close_return(void) {
 		exit(1);
 	}
 	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
+	fd_table_lock();
 	char const *filename = fd_table_lookup(fd);
 	if (filename == NULL) {
 		filename = "NULL";
 	}
 	file_stat_incr_close(filename, elapsed_ns);
+	fd_table_unlock();
 }
 
 
@@ -153,11 +155,13 @@ static void handle_read_return(pid_t tracee) {
 	}
 	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	fd_table_lock();
 	char const *filename = fd_table_lookup(fd);
 	if (filename == NULL) {
 		filename = "NULL";
 	}
 	file_stat_incr_read(filename, elapsed_ns, ret_bytes);
+	fd_table_unlock();
 }
 
 
@@ -179,11 +183,13 @@ static void handle_write_return(pid_t tracee) {
 	}
 	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	fd_table_lock();
 	char const *filename = fd_table_lookup(fd);
 	if (filename == NULL) {
 		filename = "NULL";
 	}
 	file_stat_incr_write(filename, elapsed_ns, ret_bytes);
+	fd_table_unlock();
 }
 
 
