@@ -11,6 +11,7 @@ typedef struct {
 	int fd;
 	int sc;
 	char filename_buffer[FILENAME_BUFF_SIZE];
+	int fcntl_cmd;
 } thread_tmps;
 
 

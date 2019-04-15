@@ -214,10 +214,19 @@ static void handle_dup_return(pid_t tracee) {
 // ---- fcntl ----
 
 static void handle_fcntl_call(pid_t tracee) {
-// TODO F_DUPFD FD_CLOEXEC
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	int cmd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
+	tmps->fcntl_cmd = cmd;
+	if (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) {
+		handle_dup_call(tracee);
+	}
 }
 
 static void handle_fcntl_return(pid_t tracee) {
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	if (tmps->fcntl_cmd == F_DUPFD || tmps->fcntl_cmd == F_DUPFD_CLOEXEC) {
+		handle_dup_return(tracee);
+	}
 }
 
 
