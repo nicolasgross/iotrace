@@ -6,15 +6,15 @@
 
 int main() {
 	// syscall implementation
-	int filedesc = open("./test-file.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
+	int fd = open("./test-file.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
 
-	if (filedesc < 0) {
+	if (fd < 0) {
 		printf("syscall impl error");
 		exit(1);
 	}
 
-	write(filedesc, "0", 1);
-	close(filedesc);
+	write(fd, "0", 1);
+	close(fd);
 
 
 	// FILE implementation
