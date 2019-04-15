@@ -6,6 +6,7 @@
 
 
 static GHashTable *syscall_table;
+static GMutex syscalls_mutex;
 
 
 void syscall_stat_init(void) {
@@ -34,6 +35,7 @@ static void syscall_table_insert(int const syscall) {
 }
 
 void syscall_stat_incr(int const syscall, unsigned long long const time_ns) {
+	g_mutex_lock(&syscalls_mutex);
 	syscall_stat *tmp = syscall_stat_get(syscall);
 	if (tmp == NULL) {
 		syscall_table_insert(syscall);
@@ -41,6 +43,7 @@ void syscall_stat_incr(int const syscall, unsigned long long const time_ns) {
 	}
 	tmp->count++;
 	tmp->total_ns += time_ns;
+	g_mutex_unlock(&syscalls_mutex);
 }
 
 void syscall_stat_print_all(void) {
