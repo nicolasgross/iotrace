@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <glib.h>
+#include <time.h>
 
 #include "syscall_handler.h"
 #include "file_stat.h"
@@ -22,6 +23,12 @@ static GOptionEntry entries[] = {
 	{ NULL }
 };
 
+static pid_t main_pid;
+static volatile gint active_threads = 0;
+static GMutex threads_mutex;
+static GList *threads = NULL;
+
+static volatile int err = 0;
 
 static int start_tracee(int argc, char **argv) {
 	char *args [argc+1];
@@ -33,69 +40,117 @@ static int start_tracee(int argc, char **argv) {
 	return execvp(args[0], args);
 }
 
-static pid_t wait_for_syscall(pid_t last_stopped) {
+static void start_tracer(pid_t tracee);
+
+static gpointer thread_func(gpointer tracee) {
+	pid_t tracee_pid = *(pid_t *) tracee;
+	ptrace(PTRACE_ATTACH, tracee_pid);
+	ptrace(PTRACE_SETOPTIONS, tracee_pid, NULL,
+	       PTRACE_O_TRACESYSGOOD |  // get syscall info
+	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
+	start_tracer(tracee_pid);
+	free(tracee);
+	return NULL;
+}
+
+static void threads_add(pid_t tracee) {
+	g_atomic_int_inc(&active_threads);
+	g_mutex_lock(&threads_mutex);
+	pid_t *tracee_mem = malloc(sizeof(pid_t));
+	*tracee_mem = tracee;
+	GThread *thread = g_thread_new(NULL, thread_func, tracee_mem);
+	threads = g_list_prepend(threads, thread);
+	g_mutex_unlock(&threads_mutex);
+}
+
+static int wait_for_syscall(pid_t tracee, bool is_return) {
 	int status;
-	pid_t new_stopped;
-	ptrace(PTRACE_SYSCALL, last_stopped, NULL, NULL);
+	ptrace(PTRACE_SYSCALL, tracee, NULL, NULL);
 	while (1) {
-		new_stopped = waitpid(-1, &status, __WALL);
-		if (WIFSTOPPED(status) && WSTOPSIG(status) & 0x80) {
+		waitpid(tracee, &status, __WALL);
+
+		if (is_return) {
+			if (status >> 8 == (SIGTRAP | (PTRACE_EVENT_CLONE << 8))
+			    // ||
+			    //status >> 8 == (SIGTRAP | (PTRACE_EVENT_FORK << 8)) ||
+			    //status >> 8 == (SIGTRAP | (PTRACE_EVENT_VFORK << 8))
+				) {
+				pid_t new_child;
+				ptrace(PTRACE_GETEVENTMSG, tracee, 0, &new_child);
+				threads_add(new_child);
+			}
+		}
+
+		if (WIFSTOPPED(status) && WSTOPSIG(status) == (SIGTRAP | 0x80)) {
 			// stopped by a syscall
-			return new_stopped;
+			return 0;
 		}
-		// TODO handle PID of forked/vforked/cloned process and create new
-		// thread that runs 'start_tracer'
-		if (new_stopped == -1 || WIFEXITED(status)) {
-			// TODO check whether last tracer, only exit if true
+
+
+		if (WIFEXITED(status)) {
 			// error or tracee exited
-			return -1;
+			return 1;
 		}
-		ptrace(PTRACE_SYSCALL, new_stopped, NULL, NULL);
+
+		ptrace(PTRACE_SYSCALL, tracee, NULL, NULL);
 	}
 }
 
-static int start_tracer(pid_t tracee) {
-	// TODO one fd_table per child
+static void start_tracer(pid_t tracee) {
+	// TODO threads have same fd_table, processes have separate
 	fd_table table = fd_table_create();
-	int status;
 	int syscall;
-	pid_t stopped_child = tracee;
-	waitpid(tracee, &status, 0); // wait for notification
-	ptrace(PTRACE_SETOPTIONS, tracee, NULL,
-	       PTRACE_O_TRACESYSGOOD | // get syscall info
-	       PTRACE_O_TRACECLONE | // trace cloned processes
-	       PTRACE_O_TRACEFORK | // trace forked processes
-	       PTRACE_O_TRACEVFORK | // trace vforked processes
-	       PTRACE_O_EXITKILL); // send SIGKILL to tracee if tracer exits
 	while (1) {
 		// syscall call
-		if ((stopped_child = wait_for_syscall(stopped_child)) == -1) {
+		if (wait_for_syscall(tracee, false)) {
 			break;
 		}
-		syscall = (int) ptrace(PTRACE_PEEKUSER, stopped_child,
-		                       sizeof(long) * ORIG_RAX);
-		handle_syscall_call(stopped_child, syscall);
+		syscall = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
+		handle_syscall_call(tracee, syscall);
 
 		// syscall return
-		if ((stopped_child = wait_for_syscall(stopped_child)) == -1) {
+		if (wait_for_syscall(tracee, true)) {
 			break;
 		}
-		handle_syscall_return(stopped_child, table, syscall);
+		handle_syscall_return(tracee, table, syscall);
 	}
 	fd_table_free(table);
-	return 0;
+	if (getpid() != main_pid) {
+		g_atomic_int_dec_and_test(&active_threads);
+	}
 }
 
-static int main_tracer(int pid, char const *json_filename) {
+static int main_tracer(pid_t tracee, char const *json_filename) {
+	main_pid = getpid();
 	file_stat_init();
 	syscall_stat_init();
-	int err = start_tracer(pid);
-	// TODO Wait for remaining threads
+	int status;
+	waitpid(tracee, &status, 0);    // wait for notification
+	ptrace(PTRACE_SETOPTIONS, tracee, NULL,
+	       PTRACE_O_TRACESYSGOOD |  // get syscall info
+	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
+	start_tracer(tracee);
+
+	// wait for remaining threads
+	const struct timespec sleep_interval = {0, 200000000L};
+	while (1) {
+		if (g_atomic_int_get(&active_threads) == 0) {
+			break;
+		}
+		nanosleep(&sleep_interval, NULL);
+	}
+
+	// join threads
+	g_mutex_lock(&threads_mutex);
+	g_list_foreach(threads, (GFunc) g_thread_join, NULL);
+	g_mutex_unlock(&threads_mutex);
+
 	printf("\n");
 	if (verbose) {
 		file_stat_print_all();
 		syscall_stat_print_all();
 	}
+
 	if (print_stats_as_json(json_filename)) {
 		printf("File statistics were written to '%s'\n", json_filename);
 		printf("Run 'iotrace --help' to get information about the JSON output "
@@ -104,6 +159,8 @@ static int main_tracer(int pid, char const *json_filename) {
 		fprintf(stderr, "\nError, JSON file could not be created\n");
 		err = 1;
 	}
+
+	g_list_free(threads);
 	file_stat_free();
 	syscall_stat_free();
 	return err;

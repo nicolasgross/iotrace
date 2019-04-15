@@ -28,6 +28,7 @@
 #endif
 
 
+// TODO threadsafe:
 static struct timespec start_time;
 static int fd;
 static int sc;
@@ -137,6 +138,7 @@ static void handle_close_return(fd_table table) {
 
 static void handle_read_call(pid_t tracee) {
 	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+    // TODO auslagern in eigene Funktion?
 	if (clock_gettime(USED_CLOCK, &start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of read");
 		exit(1);
