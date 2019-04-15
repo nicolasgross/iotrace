@@ -79,7 +79,7 @@ static void handle_open_call(pid_t tracee) {
 	}
 }
 
-static void handle_open_return(pid_t tracee, fd_table table) {
+static void handle_open_return(pid_t tracee) {
 	struct timespec current_time;
 	if (clock_gettime(USED_CLOCK, &current_time)) {
 		fprintf(stderr, "%s", "Error while reading end time of open/openat");
@@ -88,7 +88,7 @@ static void handle_open_return(pid_t tracee, fd_table table) {
 	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	if (fd >= 0) {
-		fd_table_insert(table, ret_fd, filename_buffer);
+		fd_table_insert(ret_fd, filename_buffer);
 	}
 	file_stat_incr_open(filename_buffer, elapsed_ns);
 }
@@ -119,14 +119,14 @@ static void handle_close_call(pid_t tracee) {
 	}
 }
 
-static void handle_close_return(fd_table table) {
+static void handle_close_return(void) {
 	struct timespec current_time;
 	if (clock_gettime(USED_CLOCK, &current_time)) {
 		fprintf(stderr, "%s", "Error while reading end time of close");
 		exit(1);
 	}
 	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
-	char const *filename = fd_table_lookup(table, fd);
+	char const *filename = fd_table_lookup(fd);
 	if (filename == NULL) {
 		filename = "NULL";
 	}
@@ -145,7 +145,7 @@ static void handle_read_call(pid_t tracee) {
 	}
 }
 
-static void handle_read_return(pid_t tracee, fd_table table) {
+static void handle_read_return(pid_t tracee) {
 	struct timespec current_time;
 	if (clock_gettime(USED_CLOCK, &current_time)) {
 		fprintf(stderr, "%s", "Error while reading end time of read");
@@ -153,7 +153,7 @@ static void handle_read_return(pid_t tracee, fd_table table) {
 	}
 	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	char const *filename = fd_table_lookup(table, fd);
+	char const *filename = fd_table_lookup(fd);
 	if (filename == NULL) {
 		filename = "NULL";
 	}
@@ -171,7 +171,7 @@ static void handle_write_call(pid_t tracee) {
 	}
 }
 
-static void handle_write_return(pid_t tracee, fd_table table) {
+static void handle_write_return(pid_t tracee) {
 	struct timespec current_time;
 	if (clock_gettime(USED_CLOCK, &current_time)) {
 		fprintf(stderr, "%s", "Error while reading end time of write");
@@ -179,7 +179,7 @@ static void handle_write_return(pid_t tracee, fd_table table) {
 	}
 	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	char const *filename = fd_table_lookup(table, fd);
+	char const *filename = fd_table_lookup(fd);
 	if (filename == NULL) {
 		filename = "NULL";
 	}
@@ -193,10 +193,10 @@ static void handle_dup_call(pid_t tracee) {
 	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 }
 
-static void handle_dup_return(pid_t tracee, fd_table table) {
+static void handle_dup_return(pid_t tracee) {
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	if (fd >= 0) {
-		fd_table_insert_dup(table, fd, ret_fd);
+		fd_table_insert_dup(fd, ret_fd);
 	}
 	// TODO Should count and times for dup be added to file statistics?
 	// Or is it neglectible/uninteresting?
@@ -271,23 +271,23 @@ void handle_syscall_call(pid_t tracee, int syscall) {
 	}
 }
 
-void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
+void handle_syscall_return(pid_t tracee, int syscall) {
 	switch(syscall) {
 		// file statistics
 		case SYS_open:
-			handle_open_return(tracee, table);
+			handle_open_return(tracee);
 			break;
 		case SYS_openat:
-			handle_open_return(tracee, table);
+			handle_open_return(tracee);
 			break;
 		case SYS_close:
-			handle_close_return(table);
+			handle_close_return();
 			break;
 		case SYS_read:
-			handle_read_return(tracee, table);
+			handle_read_return(tracee);
 			break;
 		case SYS_write:
-			handle_write_return(tracee, table);
+			handle_write_return(tracee);
 			break;
 
 		// house keeping
@@ -297,7 +297,7 @@ void handle_syscall_return(pid_t tracee, fd_table table, int syscall) {
 		case SYS_dup:
 		case SYS_dup2:
 		case SYS_dup3:
-			handle_dup_return(tracee, table);
+			handle_dup_return(tracee);
 			break;
 	}
 }

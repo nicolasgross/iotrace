@@ -68,7 +68,6 @@ static int wait_for_syscall(pid_t tracee, bool is_return) {
 	ptrace(PTRACE_SYSCALL, tracee, NULL, NULL);
 	while (1) {
 		waitpid(tracee, &status, __WALL);
-
 		if (is_return) {
 			if (status >> 8 == (SIGTRAP | (PTRACE_EVENT_CLONE << 8))
 			    // ||
@@ -97,8 +96,6 @@ static int wait_for_syscall(pid_t tracee, bool is_return) {
 }
 
 static void start_tracer(pid_t tracee) {
-	// TODO threads have same fd_table, processes have separate
-	fd_table table = fd_table_create();
 	int syscall;
 	while (1) {
 		// syscall call
@@ -112,9 +109,8 @@ static void start_tracer(pid_t tracee) {
 		if (wait_for_syscall(tracee, true)) {
 			break;
 		}
-		handle_syscall_return(tracee, table, syscall);
+		handle_syscall_return(tracee, syscall);
 	}
-	fd_table_free(table);
 	if (getpid() != main_pid) {
 		g_atomic_int_dec_and_test(&active_threads);
 	}
@@ -122,6 +118,7 @@ static void start_tracer(pid_t tracee) {
 
 static int main_tracer(pid_t tracee, char const *json_filename) {
 	main_pid = getpid();
+	fd_table_init();
 	file_stat_init();
 	syscall_stat_init();
 	int status;
@@ -161,6 +158,7 @@ static int main_tracer(pid_t tracee, char const *json_filename) {
 	}
 
 	g_list_free(threads);
+	fd_table_free();
 	file_stat_free();
 	syscall_stat_free();
 	return err;
