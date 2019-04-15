@@ -43,9 +43,7 @@ static void stat_table_insert(char const *filename) {
 	strcpy(name_mem, filename);
 	file_stat *stat_mem = malloc(sizeof(file_stat));
 	init_file_stat(stat_mem);
-	g_mutex_lock(&stats_mutex);
 	g_hash_table_insert(stat_table, name_mem, stat_mem);
-	g_mutex_unlock(&stats_mutex);
 }
 
 static void free_single_file_stat(gpointer stat) {
@@ -125,7 +123,6 @@ static void file_stat_incr_rw(read_write_stat *stat, unsigned long long const ti
 			stat->max_bps = bps;
 		}
 	}
-	g_mutex_lock(&stats_mutex);
 	unsigned long *count = g_hash_table_lookup(stat->blocks, &bytes);
 	if (count == NULL) {
 		ssize_t *key = malloc(sizeof(ssize_t));
@@ -136,7 +133,6 @@ static void file_stat_incr_rw(read_write_stat *stat, unsigned long long const ti
 		count = value;
 	}
 	*count += 1;
-	g_mutex_unlock(&stats_mutex);
 }
 
 void file_stat_incr_read(char const *filename, unsigned long long const time_ns,
