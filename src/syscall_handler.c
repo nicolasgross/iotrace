@@ -15,8 +15,8 @@
 #include "fd_table.h"
 #include "file_stat.h"
 #include "unconsidered_syscall_stat.h"
+#include "thread_temporaries.h"
 
-#define FILENAME_BUFF_SIZE 256
 #define NANOS 1000000000LL
 
 #ifdef CLOCK_MONOTONIC_RAW
@@ -26,13 +26,6 @@
 	#define USED_CLOCK CLOCK_MONOTONIC
 	#pragma message ("Compiled with clock id CLOCK_MONOTONIC")
 #endif
-
-
-// TODO threadsafe:
-static struct timespec start_time;
-static int fd;
-static int sc;
-static char filename_buffer[FILENAME_BUFF_SIZE];
 
 
 static int read_string(pid_t tracee, unsigned long base, char *dest,
@@ -68,12 +61,13 @@ static unsigned long long calc_elapsed_ns(struct timespec *start_time,
 // ---- open ----
 
 static void handle_open_call(pid_t tracee) {
+	thread_tmps *tmps = thread_tmps_get(getpid());
 	long base = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
-	if (read_string(tracee, base, filename_buffer, FILENAME_BUFF_SIZE)) {
+	if (read_string(tracee, base, tmps->filename_buffer, FILENAME_BUFF_SIZE)) {
 		fprintf(stderr, "%s", "Error while reading filename of open");
 		exit(1);
 	}
-	if (clock_gettime(USED_CLOCK, &start_time)) {
+	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of open");
 		exit(1);
 	}
@@ -85,24 +79,26 @@ static void handle_open_return(pid_t tracee) {
 		fprintf(stderr, "%s", "Error while reading end time of open/openat");
 		exit(1);
 	}
-	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	if (fd >= 0) {
-		fd_table_insert(ret_fd, filename_buffer);
+	if (tmps->fd >= 0) {
+		fd_table_insert(ret_fd, tmps->filename_buffer);
 	}
-	file_stat_incr_open(filename_buffer, elapsed_ns);
+	file_stat_incr_open(tmps->filename_buffer, elapsed_ns);
 }
 
 
 // ---- openat ----
 
 static void handle_openat_call(pid_t tracee) {
+	thread_tmps *tmps = thread_tmps_get(getpid());
 	long base = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
-	if (read_string(tracee, base, filename_buffer, FILENAME_BUFF_SIZE)) {
+	if (read_string(tracee, base, tmps->filename_buffer, FILENAME_BUFF_SIZE)) {
 		fprintf(stderr, "%s", "Error while reading filename of openat");
 		exit(1);
 	}
-	if (clock_gettime(USED_CLOCK, &start_time)) {
+	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of openat");
 		exit(1);
 	}
@@ -112,8 +108,9 @@ static void handle_openat_call(pid_t tracee) {
 // ---- close ----
 
 static void handle_close_call(pid_t tracee) {
-	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
-	if (clock_gettime(USED_CLOCK, &start_time)) {
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	tmps->fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of close");
 		exit(1);
 	}
@@ -125,9 +122,10 @@ static void handle_close_return(void) {
 		fprintf(stderr, "%s", "Error while reading end time of close");
 		exit(1);
 	}
-	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
 	fd_table_lock();
-	char const *filename = fd_table_lookup(fd);
+	char const *filename = fd_table_lookup(tmps->fd);
 	if (filename == NULL) {
 		filename = "NULL";
 	}
@@ -139,9 +137,10 @@ static void handle_close_return(void) {
 // ---- read ----
 
 static void handle_read_call(pid_t tracee) {
-	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	tmps->fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
     // TODO auslagern in eigene Funktion?
-	if (clock_gettime(USED_CLOCK, &start_time)) {
+	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of read");
 		exit(1);
 	}
@@ -153,10 +152,11 @@ static void handle_read_return(pid_t tracee) {
 		fprintf(stderr, "%s", "Error while reading end time of read");
 		exit(1);
 	}
-	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	fd_table_lock();
-	char const *filename = fd_table_lookup(fd);
+	char const *filename = fd_table_lookup(tmps->fd);
 	if (filename == NULL) {
 		filename = "NULL";
 	}
@@ -168,8 +168,9 @@ static void handle_read_return(pid_t tracee) {
 // ---- write ----
 
 static void handle_write_call(pid_t tracee) {
-	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
-	if (clock_gettime(USED_CLOCK, &start_time)) {
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	tmps->fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of write");
 		exit(1);
 	}
@@ -181,10 +182,11 @@ static void handle_write_return(pid_t tracee) {
 		fprintf(stderr, "%s", "Error while reading end time of write");
 		exit(1);
 	}
-	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	fd_table_lock();
-	char const *filename = fd_table_lookup(fd);
+	char const *filename = fd_table_lookup(tmps->fd);
 	if (filename == NULL) {
 		filename = "NULL";
 	}
@@ -196,16 +198,16 @@ static void handle_write_return(pid_t tracee) {
 // ---- dup/dup2/dup3 ----
 
 static void handle_dup_call(pid_t tracee) {
-	fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	tmps->fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 }
 
 static void handle_dup_return(pid_t tracee) {
+	thread_tmps *tmps = thread_tmps_get(getpid());
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	if (fd >= 0) {
-		fd_table_insert_dup(fd, ret_fd);
+	if (tmps->fd >= 0) {
+		fd_table_insert_dup(tmps->fd, ret_fd);
 	}
-	// TODO Should count and times for dup be added to file statistics?
-	// Or is it neglectible/uninteresting?
 }
 
 
@@ -226,8 +228,9 @@ static void handle_dup_return(pid_t tracee) {
 // ---- that are not considered in file statistics ----
 
 static void handle_unconsidered_call(int syscall) {
-	sc = syscall;
-	if (clock_gettime(USED_CLOCK, &start_time)) {
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	tmps->sc = syscall;
+	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of unconsidered "
 		        "syscall");
 		exit(1);
@@ -241,8 +244,9 @@ static void handle_unconsidered_return(void) {
 		        "syscall");
 		exit(1);
 	}
-	unsigned long long elapsed_ns = calc_elapsed_ns(&start_time, &current_time);
-	syscall_stat_incr(sc, elapsed_ns);
+	thread_tmps *tmps = thread_tmps_get(getpid());
+	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
+	syscall_stat_incr(tmps->sc, elapsed_ns);
 }
 
 

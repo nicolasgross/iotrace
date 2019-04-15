@@ -15,6 +15,7 @@
 #include "fd_table.h"
 #include "json_printer.h"
 #include "unconsidered_syscall_stat.h"
+#include "thread_temporaries.h"
 
 
 static bool verbose = false;
@@ -43,6 +44,7 @@ static int start_tracee(int argc, char **argv) {
 static void start_tracer(pid_t tracee);
 
 static gpointer thread_func(gpointer tracee) {
+	thread_tmps_insert(getpid());
 	pid_t tracee_pid = *(pid_t *) tracee;
 	ptrace(PTRACE_ATTACH, tracee_pid);
 	ptrace(PTRACE_SETOPTIONS, tracee_pid, NULL,
@@ -119,6 +121,8 @@ static void start_tracer(pid_t tracee) {
 static int main_tracer(pid_t tracee, char const *json_filename) {
 	main_pid = getpid();
 	fd_table_init();
+	thread_tmps_init();
+	thread_tmps_insert(getpid());
 	file_stat_init();
 	syscall_stat_init();
 	int status;
@@ -159,6 +163,7 @@ static int main_tracer(pid_t tracee, char const *json_filename) {
 
 	g_list_free(threads);
 	fd_table_free();
+	thread_tmps_free();
 	file_stat_free();
 	syscall_stat_free();
 	return err;
