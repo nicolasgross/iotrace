@@ -8,4 +8,7 @@ TODO
 
 ## Links
 - [Mapping of syscall arguments to registers](http://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/)
+- [Stackoverflow ptrace multithreaded application](https://stackoverflow.com/questions/5477976/how-to-ptrace-a-multi-threaded-application)
+- [ptrace blog post](https://www.cyphar.com/blog/post/20160703-remainroot-ptrace-hell)
+- [ptrace tips from the strace developers](https://github.com/strace/strace/blob/master/README-linux-ptrace)
 
