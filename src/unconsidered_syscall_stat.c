@@ -47,6 +47,7 @@ void syscall_stat_incr(int const syscall, unsigned long long const time_ns) {
 }
 
 void syscall_stat_print_all(void) {
+	// TODO print in alphabetical order
 	printf("UNCONSIDERED SYSCALLS IN FILE STATISTICS:\n\n");
 
 	GHashTableIter iter;

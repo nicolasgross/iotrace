@@ -139,15 +139,22 @@ static int main_tracer(pid_t tracee, char const *json_filename) {
 
 	// join threads
 	g_mutex_lock(&threads_mutex);
-	g_list_foreach(threads, (GFunc) g_thread_join, NULL);
+	if (threads != NULL) {
+		GList *list = threads;
+		do {
+			g_thread_join((GThread *) list->data);
+		} while ((list = (GList *) g_list_next(list)) != NULL);
+	}
 	g_mutex_unlock(&threads_mutex);
 
+	// print stats
 	printf("\n");
 	if (verbose) {
 		file_stat_print_all();
 		syscall_stat_print_all();
 	}
 
+	// print json
 	if (print_stats_as_json(json_filename)) {
 		printf("File statistics were written to '%s'\n", json_filename);
 		printf("Run 'iotrace --help' to get information about the JSON output "
