@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <glib.h>
 #include <time.h>
+#include <sys/syscall.h>
 
 #include "syscall_handler.h"
 #include "file_stat.h"
@@ -47,10 +48,13 @@ static gpointer thread_func(gpointer tracee) {
 	thread_tmps_insert(getpid());
 	pid_t tracee_pid = *(pid_t *) tracee;
 	ptrace(PTRACE_ATTACH, tracee_pid);
+	int status;
+	waitpid(tracee_pid, &status, 0);
 	ptrace(PTRACE_SETOPTIONS, tracee_pid, NULL,
 	       PTRACE_O_TRACESYSGOOD |  // get syscall info
 	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
 	start_tracer(tracee_pid);
+	g_atomic_int_dec_and_test(&active_threads);
 	free(tracee);
 	return NULL;
 }
@@ -65,19 +69,15 @@ static void threads_add(pid_t tracee) {
 	g_mutex_unlock(&threads_mutex);
 }
 
-static int wait_for_syscall(pid_t tracee, bool is_return) {
+static int wait_for_syscall(pid_t tracee, int syscall) {
 	int status;
 	ptrace(PTRACE_SYSCALL, tracee, NULL, NULL);
 	while (1) {
 		waitpid(tracee, &status, __WALL);
-		if (is_return) {
-			if (status >> 8 == (SIGTRAP | (PTRACE_EVENT_CLONE << 8))
-			    // ||
-			    //status >> 8 == (SIGTRAP | (PTRACE_EVENT_FORK << 8)) ||
-			    //status >> 8 == (SIGTRAP | (PTRACE_EVENT_VFORK << 8))
-				) {
-				pid_t new_child;
-				ptrace(PTRACE_GETEVENTMSG, tracee, 0, &new_child);
+		if (syscall == SYS_clone) {
+			// syscall return from clone
+			pid_t new_child = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+			if (new_child != -1) {
 				threads_add(new_child);
 			}
 		}
@@ -86,7 +86,6 @@ static int wait_for_syscall(pid_t tracee, bool is_return) {
 			// stopped by a syscall
 			return 0;
 		}
-
 
 		if (WIFEXITED(status)) {
 			// error or tracee exited
@@ -101,20 +100,17 @@ static void start_tracer(pid_t tracee) {
 	int syscall;
 	while (1) {
 		// syscall call
-		if (wait_for_syscall(tracee, false)) {
+		if (wait_for_syscall(tracee, -1)) {
 			break;
 		}
 		syscall = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
 		handle_syscall_call(tracee, syscall);
 
 		// syscall return
-		if (wait_for_syscall(tracee, true)) {
+		if (wait_for_syscall(tracee, syscall)) {
 			break;
 		}
 		handle_syscall_return(tracee, syscall);
-	}
-	if (getpid() != main_pid) {
-		g_atomic_int_dec_and_test(&active_threads);
 	}
 }
 
