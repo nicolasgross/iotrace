@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <sys/ptrace.h>
 #include <sys/reg.h>
 #include <sys/wait.h>
@@ -10,6 +12,7 @@
 #include <glib.h>
 #include <time.h>
 #include <sys/syscall.h>
+#include <sched.h>
 
 #include "syscall_handler.h"
 #include "file_stat.h"
@@ -25,8 +28,7 @@ static GOptionEntry entries[] = {
 	{ NULL }
 };
 
-static pid_t main_pid;
-static volatile gint active_threads = 0;
+static volatile guint active_threads = 0;
 static GMutex threads_mutex;
 static GList *threads = NULL;
 
@@ -44,27 +46,45 @@ static int start_tracee(int argc, char **argv) {
 
 static void start_tracer(pid_t tracee);
 
-static gpointer thread_func(gpointer tracee) {
-	thread_tmps_insert(getpid());
-	pid_t tracee_pid = *(pid_t *) tracee;
-	ptrace(PTRACE_ATTACH, tracee_pid);
-	int status;
-	waitpid(tracee_pid, &status, 0);
-	ptrace(PTRACE_SETOPTIONS, tracee_pid, NULL,
-	       PTRACE_O_TRACESYSGOOD |  // get syscall info
-	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
-	start_tracer(tracee_pid);
+typedef struct {
+	pid_t tracee;
+	GHashTable *fd_table;
+	guint *share_count;
+	GMutex *fd_mutex;
+} thread_start_data;
+
+static gpointer thread_func(gpointer data_ptr) {
+	thread_start_data *data = data_ptr;
+	ptrace(PTRACE_ATTACH, data->tracee);
+	thread_tmps_insert(syscall(SYS_gettid), data->fd_table, data->share_count,
+	                   data->fd_mutex);
+	start_tracer(data->tracee);
+
 	g_atomic_int_dec_and_test(&active_threads);
-	free(tracee);
+	free(data);
 	return NULL;
 }
 
-static void threads_add(pid_t tracee) {
+static void threads_add(pid_t tracee, int clone_flags) {
 	g_atomic_int_inc(&active_threads);
+
+	thread_start_data *data = malloc(sizeof(thread_start_data));
+	data->tracee = tracee;
+	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	if (clone_flags & CLONE_FILES) {
+		// shared file descriptor table
+		data->fd_table = tmps->fd_table;
+		data->share_count = tmps->share_count;
+		data->fd_mutex = tmps->fd_mutex;
+	} else {
+		// unshared file descriptor table
+		data->fd_table = fd_table_deep_copy(tmps->fd_table, tmps->fd_mutex);
+		data->share_count = NULL;
+		data->fd_mutex = NULL;
+	}
+
+	GThread *thread = g_thread_new(NULL, thread_func, data);
 	g_mutex_lock(&threads_mutex);
-	pid_t *tracee_mem = malloc(sizeof(pid_t));
-	*tracee_mem = tracee;
-	GThread *thread = g_thread_new(NULL, thread_func, tracee_mem);
 	threads = g_list_prepend(threads, thread);
 	g_mutex_unlock(&threads_mutex);
 }
@@ -76,9 +96,10 @@ static int wait_for_syscall(pid_t tracee, int syscall) {
 		waitpid(tracee, &status, __WALL);
 		if (syscall == SYS_clone) {
 			// syscall return from clone
+			int clone_flags = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 			pid_t new_child = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 			if (new_child != -1) {
-				threads_add(new_child);
+				threads_add(new_child, clone_flags);
 			}
 		}
 
@@ -97,35 +118,38 @@ static int wait_for_syscall(pid_t tracee, int syscall) {
 }
 
 static void start_tracer(pid_t tracee) {
-	int syscall;
+	int status;
+	waitpid(tracee, &status, 0);
+	ptrace(PTRACE_SETOPTIONS, tracee, NULL,
+	       PTRACE_O_TRACESYSGOOD |  // get syscall info
+	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
+
+	int sc;
 	while (1) {
 		// syscall call
 		if (wait_for_syscall(tracee, -1)) {
 			break;
 		}
-		syscall = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
-		handle_syscall_call(tracee, syscall);
+		sc = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
+		handle_syscall_call(tracee, sc);
 
 		// syscall return
-		if (wait_for_syscall(tracee, syscall)) {
+		if (wait_for_syscall(tracee, sc)) {
 			break;
 		}
-		handle_syscall_return(tracee, syscall);
+		handle_syscall_return(tracee, sc);
 	}
+
+	thread_tmps_remove(syscall(SYS_gettid));
 }
 
 static int main_tracer(pid_t tracee, char const *json_filename) {
-	main_pid = getpid();
-	fd_table_init();
 	thread_tmps_init();
-	thread_tmps_insert(getpid());
 	file_stat_init();
 	syscall_stat_init();
-	int status;
-	waitpid(tracee, &status, 0);    // wait for notification
-	ptrace(PTRACE_SETOPTIONS, tracee, NULL,
-	       PTRACE_O_TRACESYSGOOD |  // get syscall info
-	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
+
+	GHashTable *main_fd_table = fd_table_create();
+	thread_tmps_insert(syscall(SYS_gettid), main_fd_table, NULL, NULL);
 	start_tracer(tracee);
 
 	// wait for remaining threads
@@ -165,7 +189,6 @@ static int main_tracer(pid_t tracee, char const *json_filename) {
 	}
 
 	g_list_free(threads);
-	fd_table_free();
 	thread_tmps_free();
 	file_stat_free();
 	syscall_stat_free();

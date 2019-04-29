@@ -6,61 +6,71 @@
 
 
 /**
- * Lock the mutex for the file descriptor table.
+ * Creates a table that maps file descriptors to filenames.
  *
+ * @return fd_table a new file descriptor table.
  */
-void fd_table_lock(void);
+GHashTable *fd_table_create(void);
 
 /**
- * Unlock the mutex for the file descriptor table.
+ * Inserts a new file descriptor and filename into a table.
  *
- */
-void fd_table_unlock(void);
-
-/**
- * Initalizes the table that maps file descriptors to filenames.
- *
- */
-void fd_table_init(void);
-
-/**
- * Inserts a new file descriptor and filename into the table.
- *
+ * @param fd_table the file descriptor table.
+ * @param fd_mutex the mutex for locking the table.
  * @param fd the file descriptor.
  * @param filename the filename.
  */
-void fd_table_insert(int fd, char const *filename);
+void fd_table_insert(GHashTable *const fd_table, GMutex *const fd_mutex,
+                     int fd, char const *const filename);
 
 /**
- * Inserts a duplicate into the table.
+ * Inserts a duplicate into a table.
  *
+ * @param fd_table the file descriptor table.
+ * @param fd_mutex the mutex for locking the table.
  * @param orig_fd the original file descriptor.
  * @param dup_fd the new duplicate file descriptor.
  */
-void fd_table_insert_dup(int orig_fd, int dup_fd);
+void fd_table_insert_dup(GHashTable *const fd_table, GMutex *const fd_mutex,
+                         int orig_fd, int dup_fd);
 
 /**
- * Removes a file descriptor and its corresponding file name from the table.
+ * Removes a file descriptor and its corresponding file name from a table.
  *
+ * @param fd_table the file descriptor table.
+ * @param fd_mutex the mutex for locking the table.
  * @param fd the file descriptor.
  * @return true if file descriptor was found and removed.
  */
-bool fd_table_remove(int fd);
+bool fd_table_remove(GHashTable *const fd_table, GMutex *const fd_mutex, int fd);
+
+/**
+ * Creates a deep copy of a file descriptor table.
+ *
+ * @param fd_table the file descriptor table that is to be copied.
+ * @param fd_mutex the mutex for locking the table.
+ * @return the (deep) copy of the given table.
+ */
+GHashTable *fd_table_deep_copy(GHashTable *const fd_table, GMutex *const fd_mutex);
 
 /**
  * Returns the filename of a file descriptor. The caller must lock/unlock the
- * file descriptor table manually while working with the returned filename.
+ * file descriptor table manually before calling this function and while
+ * working with the returned filename.
  *
+ * @param fd_table the file descriptor table.
+ * @param fd_mutex the mutex for locking the table.
  * @param fd the file descriptor.
  * @return the filename, can be NULL if no mapping exists.
  */
-char const *fd_table_lookup(int fd);
+char const *fd_table_lookup(GHashTable *const fd_table, int fd);
 
 /**
  * Frees the file descriptor mapping table.
  *
+ * @param fd_table the file descriptor table.
  */
-void fd_table_free(void);
+void fd_table_free(GHashTable *const fd_table);
 
 
 #endif
