@@ -9,6 +9,8 @@
 #include <linux/fcntl.h>
 #include <time.h>
 #include <errno.h>
+#include <glib.h>
+#include <unistd.h>
 
 #include "syscall_handler.h"
 #include "syscall_names.h"
@@ -61,7 +63,7 @@ static unsigned long long calc_elapsed_ns(struct timespec *start_time,
 // ---- open ----
 
 static void handle_open_call(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	long base = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 	if (read_string(tracee, base, tmps->filename_buffer, FILENAME_BUFF_SIZE)) {
 		fprintf(stderr, "%s", "Error while reading filename of open");
@@ -79,7 +81,7 @@ static void handle_open_return(pid_t tracee) {
 		fprintf(stderr, "%s", "Error while reading end time of open/openat");
 		exit(1);
 	}
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	if (tmps->fd >= 0) {
@@ -93,7 +95,7 @@ static void handle_open_return(pid_t tracee) {
 // ---- openat ----
 
 static void handle_openat_call(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	long base = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
 	if (read_string(tracee, base, tmps->filename_buffer, FILENAME_BUFF_SIZE)) {
 		fprintf(stderr, "%s", "Error while reading filename of openat");
@@ -109,7 +111,7 @@ static void handle_openat_call(pid_t tracee) {
 // ---- close ----
 
 static void handle_close_call(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	tmps->fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of close");
@@ -117,13 +119,13 @@ static void handle_close_call(pid_t tracee) {
 	}
 }
 
-static void handle_close_return(void) {
+static void handle_close_return(pid_t tracee) {
 	struct timespec current_time;
 	if (clock_gettime(USED_CLOCK, &current_time)) {
 		fprintf(stderr, "%s", "Error while reading end time of close");
 		exit(1);
 	}
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
 	g_mutex_lock(tmps->fd_mutex);
 	char const *filename = fd_table_lookup(tmps->fd_table, tmps->fd);
@@ -139,7 +141,7 @@ static void handle_close_return(void) {
 // ---- read ----
 
 static void handle_read_call(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	tmps->fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
     // TODO auslagern in eigene Funktion?
 	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
@@ -154,7 +156,7 @@ static void handle_read_return(pid_t tracee) {
 		fprintf(stderr, "%s", "Error while reading end time of read");
 		exit(1);
 	}
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	g_mutex_lock(tmps->fd_mutex);
@@ -170,7 +172,7 @@ static void handle_read_return(pid_t tracee) {
 // ---- write ----
 
 static void handle_write_call(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	tmps->fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of write");
@@ -184,7 +186,7 @@ static void handle_write_return(pid_t tracee) {
 		fprintf(stderr, "%s", "Error while reading end time of write");
 		exit(1);
 	}
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	g_mutex_lock(tmps->fd_mutex);
@@ -197,15 +199,17 @@ static void handle_write_return(pid_t tracee) {
 }
 
 
+// ==== UNCONSIDERED SYSCALLS ====
+
 // ---- dup/dup2/dup3 ----
 
 static void handle_dup_call(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	tmps->fd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 }
 
 static void handle_dup_return(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	if (tmps->fd >= 0) {
 		fd_table_insert_dup(tmps->fd_table, tmps->fd_mutex, tmps->fd, ret_fd);
@@ -216,7 +220,7 @@ static void handle_dup_return(pid_t tracee) {
 // ---- fcntl ----
 
 static void handle_fcntl_call(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	int cmd = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
 	tmps->fcntl_cmd = cmd;
 	if (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) {
@@ -225,15 +229,24 @@ static void handle_fcntl_call(pid_t tracee) {
 }
 
 static void handle_fcntl_return(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	if (tmps->fcntl_cmd == F_DUPFD || tmps->fcntl_cmd == F_DUPFD_CLOEXEC) {
 		handle_dup_return(tracee);
 	}
 }
 
 
+// ---- execve ----
+
+static void handle_execve_return(pid_t tracee) {
+	// TODO unshare fd_table if it is shared
+	//thread_tmps *tmps = thread_tmps_lookup(tracee);
+	//if (g_atomic_int_get)
+}
+
+
+
 // TODO later:
-// ---- execve ---- TODO unshare fd_table if it is shared
 // ---- eventfd2 ----
 // ---- socket ----
 // ---- socketpair ----
@@ -243,9 +256,9 @@ static void handle_fcntl_return(pid_t tracee) {
 // ---- keep also track of time spent in syscalls  ----
 // ---- that are not considered in file statistics ----
 
-static void handle_unconsidered_call(int sc) {
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
-	tmps->sc = sc;
+static void handle_unconsidered_call(pid_t tracee, int syscall) {
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	tmps->sc = syscall;
 	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
 		fprintf(stderr, "%s", "Error while reading start time of unconsidered "
 		        "syscall");
@@ -253,14 +266,14 @@ static void handle_unconsidered_call(int sc) {
 	}
 }
 
-static void handle_unconsidered_return(void) {
+static void handle_unconsidered_return(pid_t tracee) {
 	struct timespec current_time;
 	if (clock_gettime(USED_CLOCK, &current_time)) {
 		fprintf(stderr, "%s", "Error while reading end time of unconsidered "
 		        "syscall");
 		exit(1);
 	}
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
 	syscall_stat_incr(tmps->sc, elapsed_ns);
 }
@@ -297,7 +310,7 @@ void handle_syscall_call(pid_t tracee, int syscall) {
 			handle_fcntl_call(tracee);
 			break;
 	}
-	handle_unconsidered_call(syscall);
+	handle_unconsidered_call(tracee, syscall);
 }
 
 void handle_syscall_return(pid_t tracee, int syscall) {
@@ -310,7 +323,7 @@ void handle_syscall_return(pid_t tracee, int syscall) {
 			handle_open_return(tracee);
 			return;
 		case SYS_close:
-			handle_close_return();
+			handle_close_return(tracee);
 			return;
 		case SYS_read:
 			handle_read_return(tracee);
@@ -321,7 +334,7 @@ void handle_syscall_return(pid_t tracee, int syscall) {
 	}
 
 	// unconsidered syscalls
-	handle_unconsidered_return();
+	handle_unconsidered_return(tracee);
 	switch (syscall) {
 		case SYS_dup:
 		case SYS_dup2:
@@ -330,6 +343,9 @@ void handle_syscall_return(pid_t tracee, int syscall) {
 			break;
 		case SYS_fcntl:
 			handle_fcntl_return(tracee);
+			break;
+		case SYS_execve:
+			handle_execve_return(tracee);
 			break;
 	}
 }

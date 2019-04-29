@@ -56,7 +56,7 @@ typedef struct {
 static gpointer thread_func(gpointer data_ptr) {
 	thread_start_data *data = data_ptr;
 	ptrace(PTRACE_ATTACH, data->tracee);
-	thread_tmps_insert(syscall(SYS_gettid), data->fd_table, data->share_count,
+	thread_tmps_insert(data->tracee, data->fd_table, data->share_count,
 	                   data->fd_mutex);
 	start_tracer(data->tracee);
 
@@ -65,12 +65,12 @@ static gpointer thread_func(gpointer data_ptr) {
 	return NULL;
 }
 
-static void threads_add(pid_t tracee, int clone_flags) {
+static void threads_add(pid_t tracee, pid_t parents_tracee, int clone_flags) {
 	g_atomic_int_inc(&active_threads);
 
 	thread_start_data *data = malloc(sizeof(thread_start_data));
 	data->tracee = tracee;
-	thread_tmps *tmps = thread_tmps_lookup(syscall(SYS_gettid));
+	thread_tmps *tmps = thread_tmps_lookup(parents_tracee);
 	if (clone_flags & CLONE_FILES) {
 		// shared file descriptor table
 		data->fd_table = tmps->fd_table;
@@ -99,7 +99,7 @@ static int wait_for_syscall(pid_t tracee, int syscall) {
 			int clone_flags = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 			pid_t new_child = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 			if (new_child != -1) {
-				threads_add(new_child, clone_flags);
+				threads_add(new_child, tracee, clone_flags);
 			}
 		}
 
@@ -124,23 +124,23 @@ static void start_tracer(pid_t tracee) {
 	       PTRACE_O_TRACESYSGOOD |  // get syscall info
 	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
 
-	int sc;
+	int syscall;
 	while (1) {
 		// syscall call
 		if (wait_for_syscall(tracee, -1)) {
 			break;
 		}
-		sc = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
-		handle_syscall_call(tracee, sc);
+		syscall = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
+		handle_syscall_call(tracee, syscall);
 
 		// syscall return
-		if (wait_for_syscall(tracee, sc)) {
+		if (wait_for_syscall(tracee, syscall)) {
 			break;
 		}
-		handle_syscall_return(tracee, sc);
+		handle_syscall_return(tracee, syscall);
 	}
 
-	thread_tmps_remove(syscall(SYS_gettid));
+	thread_tmps_remove(tracee);
 }
 
 static int main_tracer(pid_t tracee, char const *json_filename) {
@@ -149,7 +149,7 @@ static int main_tracer(pid_t tracee, char const *json_filename) {
 	syscall_stat_init();
 
 	GHashTable *main_fd_table = fd_table_create();
-	thread_tmps_insert(syscall(SYS_gettid), main_fd_table, NULL, NULL);
+	thread_tmps_insert(tracee, main_fd_table, NULL, NULL);
 	start_tracer(tracee);
 
 	// wait for remaining threads
