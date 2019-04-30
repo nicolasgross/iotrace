@@ -198,6 +198,39 @@ static void handle_write_return(pid_t tracee) {
 }
 
 
+// ---- pipe/pipe2 ----
+
+static void handle_pipe_call(pid_t tracee) {
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
+		fprintf(stderr, "%s", "Error while reading start time of pipe/pipe2");
+		exit(1);
+	}
+}
+
+static void handle_pipe_return(pid_t tracee) {
+	struct timespec current_time;
+	if (clock_gettime(USED_CLOCK, &current_time)) {
+		fprintf(stderr, "%s", "Error while reading end time of pipe/pipe2");
+		exit(1);
+	}
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, &current_time);
+	if (ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX) == 0) {
+		int *pipefd = (int *) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+		int pipefd_read = ptrace(PTRACE_PEEKDATA, tracee, pipefd, NULL);
+		int pipefd_write = ptrace(PTRACE_PEEKDATA, tracee,
+		                          pipefd + sizeof(int), NULL);
+		#define PIPE_R "pipe_r"
+		#define PIPE_W "pipe_w"
+		fd_table_insert(tmps->fd_table, tmps->fd_mutex, pipefd_read, PIPE_R);
+		fd_table_insert(tmps->fd_table, tmps->fd_mutex, pipefd_write, PIPE_W);
+		file_stat_incr_open(PIPE_R, elapsed_ns/2);
+		file_stat_incr_open(PIPE_W, elapsed_ns/2);
+	}
+}
+
+
 // ==== UNCONSIDERED SYSCALLS ====
 
 // ---- dup/dup2/dup3 ----
@@ -266,7 +299,6 @@ static void handle_execve_return(pid_t tracee) {
 // ---- eventfd2 ----
 // ---- socket ----
 // ---- socketpair ----
-// ---- pipe ----
 
 
 // ---- keep also track of time spent in syscalls  ----
@@ -313,6 +345,10 @@ void handle_syscall_call(pid_t tracee, int syscall) {
 		case SYS_write:
 			handle_write_call(tracee);
 			return;
+		case SYS_pipe:
+		case SYS_pipe2:
+			handle_pipe_call(tracee);
+			return;
 	}
 
 	// unconsidered syscalls
@@ -347,6 +383,10 @@ void handle_syscall_return(pid_t tracee, int syscall) {
 		case SYS_write:
 			handle_write_return(tracee);
 			return;
+		case SYS_pipe:
+		case SYS_pipe2:
+			handle_pipe_return(tracee);
+			break;
 	}
 
 	// unconsidered syscalls
