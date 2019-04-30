@@ -34,8 +34,7 @@ static int read_string(pid_t tracee, unsigned long base, char *dest,
                        const size_t max_len) {
 	for (size_t i = 0; i * 8 < max_len; i++) {
 		errno = 0;
-		long data = ptrace(PTRACE_PEEKDATA, tracee,
-		                   base + (i * sizeof(long)), NULL);
+		long data = ptrace(PTRACE_PEEKDATA, tracee, base + (i * sizeof(long)), NULL);
 		if (data == -1 && errno != 0) {
 			return -1;
 		}
@@ -239,9 +238,26 @@ static void handle_fcntl_return(pid_t tracee) {
 // ---- execve ----
 
 static void handle_execve_return(pid_t tracee) {
-	// TODO unshare fd_table if it is shared
-	//thread_tmps *tmps = thread_tmps_lookup(tracee);
-	//if (g_atomic_int_get)
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	if (g_atomic_int_get(tmps->share_count) > 1) {
+		// Don't decrement before copy is made, otherwise other threads may
+		// also decrement, share_count may reach zero and fd_table may be freed.
+		GHashTable *fd_copy = fd_table_deep_copy(tmps->fd_table, tmps->fd_mutex);
+		if (g_atomic_int_dec_and_test(tmps->share_count)) {
+			// All other sharing partners unshared the table in the meantime.
+			// Free old table, share count and fd_mutex can be reused.
+			fd_table_free(tmps->fd_table);
+		} else {
+			// There are still other sharing partners left. Allocate new memory
+			// for independent share_count and fd_mutex.
+			tmps->share_count = malloc(sizeof(guint));
+			*tmps->share_count = 0;
+			tmps->fd_mutex = malloc(sizeof(GMutex));
+			g_mutex_init(tmps->fd_mutex);
+		}
+		tmps->fd_table = fd_copy;
+		g_atomic_int_inc(tmps->share_count);
+	}
 }
 
 
