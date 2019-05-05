@@ -30,19 +30,21 @@
 #endif
 
 
-static int read_string(pid_t tracee, unsigned long base, char *dest,
-                       const size_t max_len) {
-	for (size_t i = 0; i * 8 < max_len; i++) {
+static int read_string(pid_t tracee, char const *base, char *dest,
+                       size_t const max_len) {
+	size_t chars_per_word = sizeof(long) / sizeof(char);
+	for (size_t i = 0; i * chars_per_word < max_len; i++) {
 		errno = 0;
-		long data = ptrace(PTRACE_PEEKDATA, tracee, base + (i * sizeof(long)), NULL);
+		long data = ptrace(PTRACE_PEEKDATA, tracee,
+		                   base + (i * chars_per_word), NULL);
 		if (data == -1 && errno != 0) {
 			return -1;
 		}
 		memcpy(dest + (i * sizeof(long)), &data, sizeof(data));
-		if (dest[i] == 0 || dest[i + 1] == 0 || dest[i + 2] == 0 ||
-		    dest[i + 3] == 0 || dest[i + 4] == 0 || dest[i + 5] == 0 ||
-		    dest[i + 6] == 0 || dest[i + 7] == 0) {
-			return 0;
+		for (size_t j = 0; j < chars_per_word; j++) {
+			if (dest[i + j] == 0) {
+				return 0;
+			}
 		}
 	}
 	dest[max_len - 1] = 0;
@@ -63,7 +65,8 @@ static unsigned long long calc_elapsed_ns(struct timespec *start_time,
 
 static void handle_open_call(pid_t tracee) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	long base = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	char const *base = (char const *) ptrace(PTRACE_PEEKUSER, tracee,
+	                                         sizeof(long) * RDI);
 	if (read_string(tracee, base, tmps->filename_buffer, FILENAME_BUFF_SIZE)) {
 		fprintf(stderr, "%s", "Error while reading filename of open");
 		exit(1);
@@ -95,7 +98,8 @@ static void handle_open_return(pid_t tracee) {
 
 static void handle_openat_call(pid_t tracee) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	long base = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
+	char const *base = (char const *) ptrace(PTRACE_PEEKUSER, tracee,
+	                                         sizeof(long) * RSI);
 	if (read_string(tracee, base, tmps->filename_buffer, FILENAME_BUFF_SIZE)) {
 		fprintf(stderr, "%s", "Error while reading filename of openat");
 		exit(1);
