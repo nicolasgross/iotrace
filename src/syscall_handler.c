@@ -219,8 +219,7 @@ static void handle_pipe_return(pid_t tracee) {
 	if (ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX) == 0) {
 		int *pipefd = (int *) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 		int pipefd_read = ptrace(PTRACE_PEEKDATA, tracee, pipefd, NULL);
-		int pipefd_write = ptrace(PTRACE_PEEKDATA, tracee,
-		                          pipefd + sizeof(int), NULL);
+		int pipefd_write = ptrace(PTRACE_PEEKDATA, tracee, pipefd + 1, NULL);
 		#define PIPE_R "pipe_r"
 		#define PIPE_W "pipe_w"
 		fd_table_insert(tmps->fd_table, tmps->fd_mutex, pipefd_read, PIPE_R);
@@ -293,7 +292,7 @@ static void handle_execve_return(pid_t tracee) {
 	}
 }
 
-
+// TODO handle CLOEXEC flag for fds
 
 // TODO later:
 // ---- eventfd2 ----

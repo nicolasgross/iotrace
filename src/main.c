@@ -99,6 +99,8 @@ static int wait_for_syscall(pid_t tracee, int syscall) {
 			int clone_flags = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 			pid_t new_child = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 			if (new_child != -1) {
+			    // TODO differentiate between threads and processes
+				kill(new_child, SIGSTOP); // notify parent that tracing can start
 				threads_add(new_child, tracee, clone_flags);
 			}
 		}
