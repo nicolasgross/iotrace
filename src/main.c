@@ -89,18 +89,21 @@ static void threads_add(pid_t tracee, pid_t parents_tracee, int clone_flags) {
 	g_mutex_unlock(&threads_mutex);
 }
 
-static int wait_for_syscall(pid_t tracee, int syscall) {
+static int wait_for_syscall(pid_t tracee, int sc) {
 	int status;
 	ptrace(PTRACE_SYSCALL, tracee, NULL, NULL);
 	while (1) {
 		waitpid(tracee, &status, __WALL);
-		if (syscall == SYS_clone) {
+		if (sc == SYS_clone) {
 			// syscall return from clone
 			int clone_flags = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 			pid_t new_child = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 			if (new_child != -1) {
-			    // TODO differentiate between threads and processes
-				kill(new_child, SIGSTOP); // notify parent that tracing can start
+				if (clone_flags & CLONE_THREAD) {
+					syscall(SYS_tgkill, getpid(), new_child, SIGSTOP);
+				} else {
+					kill(new_child, SIGSTOP);
+				}
 				threads_add(new_child, tracee, clone_flags);
 			}
 		}

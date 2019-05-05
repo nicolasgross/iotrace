@@ -292,6 +292,8 @@ static void handle_execve_return(pid_t tracee) {
 	}
 }
 
+// TODO read args in call, not in return
+
 // TODO handle CLOEXEC flag for fds
 
 // TODO later:
