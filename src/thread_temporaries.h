@@ -10,10 +10,10 @@
 
 typedef struct {
 	struct timespec start_time;
-	int fd;
-	int sc;
+	void *ptr;
+	int int_a;
+	int int_b;
 	char filename_buffer[FILENAME_BUFF_SIZE];
-	int fcntl_cmd;
 	GHashTable *fd_table;
 	guint *share_count;
 	GMutex *fd_mutex;
