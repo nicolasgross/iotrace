@@ -61,19 +61,31 @@ static unsigned long long calc_elapsed_ns(struct timespec *start_time,
 }
 
 
-// ---- open ----
+// ---- open/openat ----
 
-static void handle_open_call(pid_t tracee) {
+static void handle_open_call(pid_t tracee, bool openat) {
+	int name_reg;
+	int flags_reg;
+	char *name;
+	if (openat) {
+		name_reg = RSI;
+		flags_reg = RDX;
+		name = "openat";
+	} else {
+		name_reg = RDI;
+		flags_reg = RSI;
+		name = "open";
+	}
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	tmps-> int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
+	tmps-> int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * flags_reg);
 	char const *base = (char const *) ptrace(PTRACE_PEEKUSER, tracee,
-	                                         sizeof(long) * RDI);
+	                                         sizeof(long) * name_reg);
 	if (read_string(tracee, base, tmps->filename_buffer, FILENAME_BUFF_SIZE)) {
-		fprintf(stderr, "%s", "Error while reading filename of open");
+		fprintf(stderr, "Error while reading filename of %s", name);
 		exit(1);
 	}
 	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
-		fprintf(stderr, "%s", "Error while reading start time of open");
+		fprintf(stderr, "Error while reading start time of %s", name);
 		exit(1);
 	}
 }
@@ -92,24 +104,6 @@ static void handle_open_return(pid_t tracee) {
 		                tmps->filename_buffer, (tmps->int_a & O_CLOEXEC) != 0);
 	}
 	file_stat_incr_open(tmps->filename_buffer, elapsed_ns);
-}
-
-
-// ---- openat ----
-
-static void handle_openat_call(pid_t tracee) {
-	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	tmps->int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDX);
-	char const *base = (char const *) ptrace(PTRACE_PEEKUSER, tracee,
-	                                         sizeof(long) * RSI);
-	if (read_string(tracee, base, tmps->filename_buffer, FILENAME_BUFF_SIZE)) {
-		fprintf(stderr, "%s", "Error while reading filename of openat");
-		exit(1);
-	}
-	if (clock_gettime(USED_CLOCK, &tmps->start_time)) {
-		fprintf(stderr, "%s", "Error while reading start time of openat");
-		exit(1);
-	}
 }
 
 
@@ -357,10 +351,10 @@ void handle_syscall_call(pid_t tracee, int syscall) {
 	// file statistics
 	switch (syscall) {
 		case SYS_open:
-			handle_open_call(tracee);
+			handle_open_call(tracee, false);
 			return;
 		case SYS_openat:
-			handle_openat_call(tracee);
+			handle_open_call(tracee, true);
 			return;
 		case SYS_close:
 			handle_close_call(tracee);
