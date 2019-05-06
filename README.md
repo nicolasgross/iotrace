@@ -2,6 +2,7 @@
 TODO
 
 ## Dependencies
+- cmake
 - pkg-config
 - libglib-2.0
 - libjson-glib-1.0
