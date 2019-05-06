@@ -59,14 +59,15 @@ static void save_current_time(struct timespec *start_time, int sc) {
 	}
 }
 
-static unsigned long long calc_elapsed_ns(struct timespec *start_time, int sc) {
+static unsigned long long calc_elapsed_ns(pid_t tracee, thread_tmps **tmps, int sc) {
 	struct timespec current_time;
 	if (clock_gettime(USED_CLOCK, &current_time)) {
 		fprintf(stderr, "Error while reading end time of %s", syscall_names[sc]);
 		exit(1);
 	}
-	unsigned long long start_ns = start_time->tv_sec * NANOS +
-	                              start_time->tv_nsec;
+	*tmps = thread_tmps_lookup(tracee);
+	unsigned long long start_ns = (*tmps)->start_time.tv_sec * NANOS +
+	                              (*tmps)->start_time.tv_nsec;
 	unsigned long long current_ns = current_time.tv_sec * NANOS +
 	                                current_time.tv_nsec;
 	return current_ns - start_ns;
@@ -99,8 +100,8 @@ static void handle_open_call(pid_t tracee, int sc, bool openat) {
 }
 
 static void handle_open_return(pid_t tracee, int sc) {
-	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, sc);
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	if (ret_fd >= 0) {
 		fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd,
@@ -119,8 +120,8 @@ static void handle_close_call(pid_t tracee, int sc) {
 }
 
 static void handle_close_return(pid_t tracee, int sc) {
-	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, sc);
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	g_mutex_lock(tmps->fd_mutex);
 	char const *filename = fd_table_lookup(tmps->fd_table, tmps->int_a);
 	if (filename == NULL) {
@@ -141,8 +142,8 @@ static void handle_read_call(pid_t tracee, int sc) {
 }
 
 static void handle_read_return(pid_t tracee, int sc) {
-	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, sc);
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	g_mutex_lock(tmps->fd_mutex);
 	char const *filename = fd_table_lookup(tmps->fd_table, tmps->int_a);
@@ -163,8 +164,8 @@ static void handle_write_call(pid_t tracee, int sc) {
 }
 
 static void handle_write_return(pid_t tracee, int sc) {
-	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, sc);
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	g_mutex_lock(tmps->fd_mutex);
 	char const *filename = fd_table_lookup(tmps->fd_table, tmps->int_a);
@@ -188,8 +189,8 @@ static void handle_pipe_call(pid_t tracee, int sc, bool pipe2) {
 }
 
 static void handle_pipe_return(pid_t tracee, int sc, bool pipe2) {
-	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, sc);
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	if (ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX) == 0) {
 		int *pipefd = tmps->ptr;
 		int pipefd_read = ptrace(PTRACE_PEEKDATA, tracee, pipefd, NULL);
@@ -301,8 +302,8 @@ static void handle_unconsidered_call(pid_t tracee, int sc) {
 }
 
 static void handle_unconsidered_return(pid_t tracee, int sc) {
-	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	unsigned long long elapsed_ns = calc_elapsed_ns(&tmps->start_time, sc);
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	syscall_stat_incr(sc, elapsed_ns);
 }
 
