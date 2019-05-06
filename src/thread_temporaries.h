@@ -13,6 +13,7 @@ typedef struct {
 	void *ptr;
 	int int_a;
 	int int_b;
+	int int_c;
 	char filename_buffer[FILENAME_BUFF_SIZE];
 	GHashTable *fd_table;
 	guint *share_count;
