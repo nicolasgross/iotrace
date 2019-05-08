@@ -6,6 +6,7 @@ set(CMAKE_C_FLAGS "-Wall -Wextra")
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 find_package(PkgConfig REQUIRED)
+find_package(MPI REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 pkg_check_modules(JSON_GLIB REQUIRED json-glib-1.0)
 pkg_check_modules(GOBJECT REQUIRED gobject-2.0)
@@ -29,4 +30,8 @@ target_link_libraries(iotrace glib-2.0 json-glib-1.0 gobject-2.0)
 add_executable(diskio test test/diskio.c)
 
 add_executable(dup test test/dup.c)
+
+add_executable(mpi-hello-world test test/mpi-hello-world.c)
+target_include_directories(mpi-hello-world PRIVATE ${MPI_INCLUDE_PATH})
+target_link_libraries(mpi-hello-world ${MPI_LIBRARIES})
 
