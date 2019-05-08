@@ -234,6 +234,32 @@ static void handle_socket_return(pid_t tracee, int sc) {
 }
 
 
+// ---- socketpair ----
+
+static void handle_socketpair_call(pid_t tracee, int sc) {
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	tmps->ptr = (int *) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * R10);
+	save_current_time(&tmps->start_time, sc);
+}
+
+static void handle_socketpair_return(pid_t tracee, int sc) {
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
+	if (ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX) == 0) {
+		int *socket_pair = tmps->ptr;
+		int socket_a = ptrace(PTRACE_PEEKDATA, tracee, socket_pair, NULL);
+		int socket_b = ptrace(PTRACE_PEEKDATA, tracee, socket_pair + 1, NULL);
+		#define SOCKET "socket"
+		fd_table_insert(tmps->fd_table, tmps->fd_mutex, socket_a,
+		                SOCKET, false);
+		fd_table_insert(tmps->fd_table, tmps->fd_mutex, socket_b,
+		                SOCKET, false);
+		file_stat_incr_open(SOCKET, elapsed_ns/2);
+		file_stat_incr_open(SOCKET, elapsed_ns/2);
+	}
+}
+
+
 // ==== UNCONSIDERED SYSCALLS ====
 
 // ---- dup/dup2/dup3 ----
@@ -307,11 +333,8 @@ static void handle_execve_return(pid_t tracee) {
 }
 
 
-
-
 // TODO later:
 // ---- eventfd/eventfd2 ----
-// ---- socketpair ----
 
 
 // ---- keep also track of time spent in syscalls  ----
@@ -356,6 +379,9 @@ void handle_syscall_call(pid_t tracee, int sc) {
 		case SYS_socket:
 			handle_socket_call(tracee, sc);
 			return;
+		case SYS_socketpair:
+			handle_socketpair_call(tracee, sc);
+			return;
 	}
 
 	// unconsidered syscalls
@@ -398,6 +424,9 @@ void handle_syscall_return(pid_t tracee, int sc) {
 			return;
 		case SYS_socket:
 			handle_socket_return(tracee, sc);
+			return;
+		case SYS_socketpair:
+			handle_socketpair_return(tracee, sc);
 			return;
 	}
 
