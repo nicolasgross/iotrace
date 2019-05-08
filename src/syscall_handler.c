@@ -6,6 +6,9 @@
 #include <sys/wait.h>
 #include <sys/syscall.h>
 #include <sys/user.h>
+#include <sys/socket.h>
+#include <sys/eventfd.h>
+#include <sys/epoll.h>
 #include <linux/fcntl.h>
 #include <time.h>
 #include <errno.h>
@@ -28,6 +31,12 @@
 	#define USED_CLOCK CLOCK_MONOTONIC
 	#pragma message ("Compiled with clock id CLOCK_MONOTONIC")
 #endif
+
+#define PIPE_R "pipe_r"
+#define PIPE_W "pipe_w"
+#define SOCKET "socket"
+#define EVENTFD "eventfd"
+#define EPOLL "epoll"
 
 
 static int read_string(pid_t tracee, char const *base, char *dest,
@@ -89,7 +98,7 @@ static void handle_open_call(pid_t tracee, int sc, bool openat) {
 		flags_reg = RSI;
 	}
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	tmps-> int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * flags_reg);
+	tmps->int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * flags_reg);
 	char const *base = (char const *) ptrace(PTRACE_PEEKUSER, tracee,
 	                                         sizeof(long) * name_reg);
 	if (read_string(tracee, base, tmps->filename_buffer, FILENAME_BUFF_SIZE)) {
@@ -195,8 +204,6 @@ static void handle_pipe_return(pid_t tracee, int sc, bool pipe2) {
 		int *pipefd = tmps->ptr;
 		int pipefd_read = ptrace(PTRACE_PEEKDATA, tracee, pipefd, NULL);
 		int pipefd_write = ptrace(PTRACE_PEEKDATA, tracee, pipefd + 1, NULL);
-		#define PIPE_R "pipe_r"
-		#define PIPE_W "pipe_w"
 		if (pipe2) {
 			fd_table_insert(tmps->fd_table, tmps->fd_mutex, pipefd_read,
 			                PIPE_R, (tmps->int_a & O_CLOEXEC) != 0);
@@ -218,7 +225,7 @@ static void handle_pipe_return(pid_t tracee, int sc, bool pipe2) {
 
 static void handle_socket_call(pid_t tracee, int sc) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
-	tmps-> int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
+	tmps->int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
 	save_current_time(&tmps->start_time, sc);
 }
 
@@ -228,9 +235,9 @@ static void handle_socket_return(pid_t tracee, int sc) {
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	if (ret_fd >= 0) {
 		fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd,
-		                "socket", (tmps->int_a & O_CLOEXEC) != 0);
+		                SOCKET, (tmps->int_a & SOCK_CLOEXEC) != 0);
 	}
-	file_stat_incr_open("socket", elapsed_ns);
+	file_stat_incr_open(SOCKET, elapsed_ns);
 }
 
 
@@ -249,14 +256,63 @@ static void handle_socketpair_return(pid_t tracee, int sc) {
 		int *socket_pair = tmps->ptr;
 		int socket_a = ptrace(PTRACE_PEEKDATA, tracee, socket_pair, NULL);
 		int socket_b = ptrace(PTRACE_PEEKDATA, tracee, socket_pair + 1, NULL);
-		#define SOCKET "socket"
-		fd_table_insert(tmps->fd_table, tmps->fd_mutex, socket_a,
-		                SOCKET, false);
-		fd_table_insert(tmps->fd_table, tmps->fd_mutex, socket_b,
-		                SOCKET, false);
+		fd_table_insert(tmps->fd_table, tmps->fd_mutex, socket_a, SOCKET, false);
+		fd_table_insert(tmps->fd_table, tmps->fd_mutex, socket_b, SOCKET, false);
 		file_stat_incr_open(SOCKET, elapsed_ns/2);
 		file_stat_incr_open(SOCKET, elapsed_ns/2);
 	}
+}
+
+
+// ---- eventfd/eventfd2 ----
+
+static void handle_eventfd_call(pid_t tracee, int sc, bool eventfd2) {
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	if (eventfd2) {
+		tmps->int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
+	}
+	save_current_time(&tmps->start_time, sc);
+}
+
+static void handle_eventfd_return(pid_t tracee, int sc, bool eventfd2) {
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
+	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	if (ret_fd >= 0) {
+		if (eventfd2) {
+			fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd,
+			                EVENTFD, (tmps->int_a & EFD_CLOEXEC) != 0);
+		} else {
+			fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd, EVENTFD, false);
+		}
+	}
+	file_stat_incr_open(EVENTFD, elapsed_ns);
+}
+
+
+// ---- epoll_create/epoll_create1 ----
+
+static void handle_epollcreate_call(pid_t tracee, int sc, bool epoll_create1) {
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	if (epoll_create1) {
+		tmps->int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	}
+	save_current_time(&tmps->start_time, sc);
+}
+
+static void handle_epollcreate_return(pid_t tracee, int sc, bool epoll_create1) {
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
+	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	if (ret_fd >= 0) {
+		if (epoll_create1) {
+			fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd,
+			                EPOLL, (tmps->int_a & EPOLL_CLOEXEC) != 0);
+		} else {
+			fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd, EPOLL, false);
+		}
+	}
+	file_stat_incr_open(EPOLL, elapsed_ns);
 }
 
 
@@ -333,10 +389,6 @@ static void handle_execve_return(pid_t tracee) {
 }
 
 
-// TODO later:
-// ---- eventfd/eventfd2 ----
-
-
 // ---- keep also track of time spent in syscalls  ----
 // ---- that are not considered in file statistics ----
 
@@ -381,6 +433,18 @@ void handle_syscall_call(pid_t tracee, int sc) {
 			return;
 		case SYS_socketpair:
 			handle_socketpair_call(tracee, sc);
+			return;
+		case SYS_eventfd:
+			handle_eventfd_call(tracee, sc, false);
+			return;
+		case SYS_eventfd2:
+			handle_eventfd_call(tracee, sc, true);
+			return;
+		case SYS_epoll_create:
+			handle_epollcreate_call(tracee, sc, false);
+			return;
+		case SYS_epoll_create1:
+			handle_epollcreate_call(tracee, sc, true);
 			return;
 	}
 
@@ -427,6 +491,18 @@ void handle_syscall_return(pid_t tracee, int sc) {
 			return;
 		case SYS_socketpair:
 			handle_socketpair_return(tracee, sc);
+			return;
+		case SYS_eventfd:
+			handle_eventfd_return(tracee, sc, false);
+			return;
+		case SYS_eventfd2:
+			handle_eventfd_return(tracee, sc, true);
+			return;
+		case SYS_epoll_create:
+			handle_epollcreate_return(tracee, sc, false);
+			return;
+		case SYS_epoll_create1:
+			handle_epollcreate_return(tracee, sc, true);
 			return;
 	}
 
