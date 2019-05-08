@@ -37,6 +37,7 @@
 #define SOCKET "socket"
 #define EVENTFD "eventfd"
 #define EPOLL "epoll"
+#define ACCEPT "accept"
 
 
 static int read_string(pid_t tracee, char const *base, char *dest,
@@ -316,6 +317,32 @@ static void handle_epollcreate_return(pid_t tracee, int sc, bool epoll_create1) 
 }
 
 
+// ---- accept/accept4 ----
+
+static void handle_accept_call(pid_t tracee, int sc, bool accept4) {
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	if (accept4) {
+		tmps->int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * R10);
+	}
+	save_current_time(&tmps->start_time, sc);
+}
+
+static void handle_accept_return(pid_t tracee, int sc, bool accept4) {
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
+	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	if (ret_fd >= 0) {
+		if (accept4) {
+			fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd,
+			                ACCEPT, (tmps->int_a & SOCK_CLOEXEC) != 0);
+		} else {
+			fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd, ACCEPT, false);
+		}
+	}
+	file_stat_incr_open(ACCEPT, elapsed_ns);
+}
+
+
 // ==== UNCONSIDERED SYSCALLS ====
 
 // ---- dup/dup2/dup3 ----
@@ -446,6 +473,12 @@ void handle_syscall_call(pid_t tracee, int sc) {
 		case SYS_epoll_create1:
 			handle_epollcreate_call(tracee, sc, true);
 			return;
+		case SYS_accept:
+			handle_accept_call(tracee, sc, false);
+			return;
+		case SYS_accept4:
+			handle_accept_call(tracee, sc, true);
+			return;
 	}
 
 	// unconsidered syscalls
@@ -503,6 +536,12 @@ void handle_syscall_return(pid_t tracee, int sc) {
 			return;
 		case SYS_epoll_create1:
 			handle_epollcreate_return(tracee, sc, true);
+			return;
+		case SYS_accept:
+			handle_accept_return(tracee, sc, false);
+			return;
+		case SYS_accept4:
+			handle_accept_return(tracee, sc, true);
 			return;
 	}
 
