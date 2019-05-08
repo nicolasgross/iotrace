@@ -51,7 +51,7 @@ static int read_string(pid_t tracee, char const *base, char *dest,
 		}
 		memcpy(dest + (i * sizeof(long)), &data, sizeof(data));
 		for (size_t j = 0; j < chars_per_word; j++) {
-			if (dest[i + j] == 0) {
+			if (dest[(i * chars_per_word) + j] == '\0') {
 				return 0;
 			}
 		}
