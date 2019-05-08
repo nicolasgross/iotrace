@@ -214,6 +214,26 @@ static void handle_pipe_return(pid_t tracee, int sc, bool pipe2) {
 }
 
 
+// ---- socket ----
+
+static void handle_socket_call(pid_t tracee, int sc) {
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	tmps-> int_a = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
+	save_current_time(&tmps->start_time, sc);
+}
+
+static void handle_socket_return(pid_t tracee, int sc) {
+	thread_tmps *tmps;
+	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
+	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	if (ret_fd >= 0) {
+		fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd,
+		                "socket", (tmps->int_a & O_CLOEXEC) != 0);
+	}
+	file_stat_incr_open("socket", elapsed_ns);
+}
+
+
 // ==== UNCONSIDERED SYSCALLS ====
 
 // ---- dup/dup2/dup3 ----
@@ -287,9 +307,10 @@ static void handle_execve_return(pid_t tracee) {
 }
 
 
+
+
 // TODO later:
-// ---- eventfd2 ----
-// ---- socket ----
+// ---- eventfd/eventfd2 ----
 // ---- socketpair ----
 
 
@@ -332,6 +353,9 @@ void handle_syscall_call(pid_t tracee, int sc) {
 		case SYS_pipe2:
 			handle_pipe_call(tracee, sc, true);
 			return;
+		case SYS_socket:
+			handle_socket_call(tracee, sc);
+			return;
 	}
 
 	// unconsidered syscalls
@@ -371,6 +395,9 @@ void handle_syscall_return(pid_t tracee, int sc) {
 			return;
 		case SYS_pipe2:
 			handle_pipe_return(tracee, sc, true);
+			return;
+		case SYS_socket:
+			handle_socket_return(tracee, sc);
 			return;
 	}
 
