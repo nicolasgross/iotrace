@@ -89,21 +89,20 @@ static void threads_add(pid_t tracee, pid_t parents_tracee, int clone_flags) {
 	g_mutex_unlock(&threads_mutex);
 }
 
-static int wait_for_syscall(pid_t tracee, int sc) {
+static int wait_for_syscall(pid_t tracee) {
 	int status;
 	ptrace(PTRACE_SYSCALL, tracee, NULL, NULL);
 	while (1) {
 		waitpid(tracee, &status, __WALL);
-		if (sc == SYS_clone) {
-			// syscall return from clone
+		if (status >> 8 == (SIGTRAP | (PTRACE_EVENT_CLONE << 8)) ||
+		    status >> 8 == (SIGTRAP | (PTRACE_EVENT_FORK << 8)) ||
+		    status >> 8 == (SIGTRAP | (PTRACE_EVENT_VFORK << 8))) {
 			int clone_flags = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
-			pid_t new_child = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-			if (new_child != -1) {
-				if (clone_flags & CLONE_THREAD) {
-					syscall(SYS_tgkill, getpid(), new_child, SIGSTOP);
-				} else {
-					kill(new_child, SIGSTOP);
-				}
+			pid_t new_child;
+			ptrace(PTRACE_GETEVENTMSG, tracee, NULL, (long) &new_child);
+			if (new_child >= 0) {
+				waitpid(new_child, &status, __WALL);
+				ptrace(PTRACE_DETACH, new_child, NULL, SIGSTOP);
 				threads_add(new_child, tracee, clone_flags);
 			}
 		}
@@ -125,22 +124,24 @@ static int wait_for_syscall(pid_t tracee, int sc) {
 static void start_tracer(pid_t tracee) {
 	int status;
 	waitpid(tracee, &status, 0);
-	// TODO Find solution to circumvent race condition in cloned threads/processes
 	ptrace(PTRACE_SETOPTIONS, tracee, NULL,
 	       PTRACE_O_TRACESYSGOOD |  // get syscall info
+	       PTRACE_O_TRACECLONE |    // trace cloned processes
+	       PTRACE_O_TRACEFORK |     // trace forked processes
+	       PTRACE_O_TRACEVFORK |    // trace vforked processes
 	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
 
 	int syscall;
 	while (1) {
 		// syscall call
-		if (wait_for_syscall(tracee, -1)) {
+		if (wait_for_syscall(tracee)) {
 			break;
 		}
 		syscall = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
 		handle_syscall_call(tracee, syscall);
 
 		// syscall return
-		if (wait_for_syscall(tracee, syscall)) {
+		if (wait_for_syscall(tracee)) {
 			break;
 		}
 		handle_syscall_return(tracee, syscall);
