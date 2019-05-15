@@ -149,6 +149,18 @@ static void start_tracer(pid_t tracee) {
 	thread_tmps_remove(tracee);
 }
 
+static void get_mpi_rank(char **rank) {
+	if ((*rank = getenv("PMI_RANK"))) {
+		return;
+	} else if ((*rank = getenv("PMIX_RANK"))) {
+		return;
+	} else if ((*rank = getenv("OMPI_COMM_WORLD_RANK"))) {
+		return;
+	} else {
+		*rank = getenv("ALPS_APP_PE");
+	}
+}
+
 static int main_tracer(pid_t tracee, char const *json_filename) {
 	thread_tmps_init();
 	file_stat_init();
@@ -185,8 +197,15 @@ static int main_tracer(pid_t tracee, char const *json_filename) {
 	}
 
 	// print json
-	if (print_stats_as_json(json_filename)) {
-		printf("File statistics were written to '%s'\n", json_filename);
+	char hostname[256];
+	gethostname(hostname, 256);
+	char *mpi_rank;
+	get_mpi_rank(&mpi_rank);
+	char filename[strlen(json_filename) + strlen(hostname) + 10];
+	sprintf(filename, "%s_%s_r%s.json", json_filename, hostname,
+	        mpi_rank ? mpi_rank : "NULL");
+	if (print_stats_as_json(filename)) {
+		printf("File statistics were written to '%s'\n", filename);
 		printf("Run 'iotrace --help' to get information about the JSON output "
 		       "format\n");
 	} else {
