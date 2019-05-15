@@ -428,7 +428,7 @@ static void handle_ioctl_call(pid_t tracee) {
 static void handle_ioctl_return(pid_t tracee) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
 	int ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
-	if (tmps->int_b & TIOCGPTPEER) {
+	if (tmps->int_b == TIOCGPTPEER) {
 		fd_table_insert_dup(tmps->fd_table, tmps->fd_mutex, tmps->int_a,
 		                    ret_fd, false, true);
 	}
