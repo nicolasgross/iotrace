@@ -32,9 +32,10 @@ void fd_table_insert(GHashTable *const fd_table, GMutex *const fd_mutex,
  * @param orig_fd the original file descriptor.
  * @param dup_fd the new duplicate file descriptor.
  * @param cloexec the value of the cloexec flag.
+ * @param slave whether the fd refers to a pseudoterminal peer slave.
  */
 void fd_table_insert_dup(GHashTable *const fd_table, GMutex *const fd_mutex,
-                         int orig_fd, int dup_fd, bool cloexec);
+                         int orig_fd, int dup_fd, bool cloexec, bool slave);
 
 /**
  * Sets the cloexec flag for a file descriptor.

@@ -125,6 +125,7 @@ static int wait_for_syscall(pid_t tracee, int sc) {
 static void start_tracer(pid_t tracee) {
 	int status;
 	waitpid(tracee, &status, 0);
+	// TODO Find solution to circumvent race condition in cloned threads/processes
 	ptrace(PTRACE_SETOPTIONS, tracee, NULL,
 	       PTRACE_O_TRACESYSGOOD |  // get syscall info
 	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits

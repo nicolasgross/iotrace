@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
+#include <sys/ioctl.h>
 #include <linux/fcntl.h>
 #include <time.h>
 #include <errno.h>
@@ -357,7 +358,7 @@ static void handle_dup_return(pid_t tracee) {
 	int ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
 	if (tmps->int_a >= 0 && tmps->int_a != ret_fd) {
 		fd_table_insert_dup(tmps->fd_table, tmps->fd_mutex, tmps->int_a,
-		                    ret_fd, false);
+		                    ret_fd, false, false);
 	}
 }
 
@@ -377,10 +378,10 @@ static void handle_fcntl_return(pid_t tracee) {
 		thread_tmps *tmps = thread_tmps_lookup(tracee);
 		if (tmps->int_b == F_DUPFD) {
 			fd_table_insert_dup(tmps->fd_table, tmps->fd_mutex, tmps->int_a,
-			                    ret_fd, false);
+			                    ret_fd, false, false);
 		} else if (tmps->int_b == F_DUPFD_CLOEXEC) {
 			fd_table_insert_dup(tmps->fd_table, tmps->fd_mutex, tmps->int_a,
-			                    ret_fd, true);
+			                    ret_fd, true, false);
 		} else if (tmps->int_b == F_SETFD) {
 			fd_table_set_cloexec(tmps->fd_table, tmps->fd_mutex, tmps->int_a,
 			                     (tmps->int_c & FD_CLOEXEC) != 0);
@@ -413,6 +414,24 @@ static void handle_execve_return(pid_t tracee) {
 		g_atomic_int_inc(tmps->share_count);
 	}
 	fd_table_remove_cloexec(tmps->fd_table, tmps->fd_mutex);
+}
+
+
+// ---- ioctl ----
+
+static void handle_ioctl_call(pid_t tracee) {
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+    tmps->int_a = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	tmps->int_b = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
+}
+
+static void handle_ioctl_return(pid_t tracee) {
+	thread_tmps *tmps = thread_tmps_lookup(tracee);
+	int ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
+	if (tmps->int_b & TIOCGPTPEER) {
+		fd_table_insert_dup(tmps->fd_table, tmps->fd_mutex, tmps->int_a,
+		                    ret_fd, false, true);
+	}
 }
 
 
@@ -491,6 +510,9 @@ void handle_syscall_call(pid_t tracee, int sc) {
 		case SYS_fcntl:
 			handle_fcntl_call(tracee);
 			break;
+		case SYS_ioctl:
+			handle_ioctl_call(tracee);
+			break;
 	}
 	handle_unconsidered_call(tracee, sc);
 }
@@ -558,6 +580,9 @@ void handle_syscall_return(pid_t tracee, int sc) {
 			break;
 		case SYS_execve:
 			handle_execve_return(tracee);
+			break;
+		case SYS_ioctl:
+			handle_ioctl_return(tracee);
 			break;
 	}
 }

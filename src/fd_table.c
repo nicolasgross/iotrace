@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "fd_table.h"
+#include "thread_temporaries.h"
 
 
 typedef struct {
@@ -49,13 +50,21 @@ void fd_table_insert(GHashTable *const fd_table, GMutex *const fd_mutex,
 }
 
 void fd_table_insert_dup(GHashTable *const fd_table, GMutex *const fd_mutex,
-                         int orig_fd, int dup_fd, bool cloexec) {
+                         int orig_fd, int dup_fd, bool cloexec, bool slave) {
 	g_mutex_lock(fd_mutex);
 	fd_table_entry *entry = g_hash_table_lookup(fd_table, &orig_fd);
-	if (cloexec) {
-		fd_table_insert_intern(fd_table, dup_fd, entry->filename, true);
+	if (slave) {
+		char filename[FILENAME_BUFF_SIZE];
+		strcpy(filename, entry->filename);
+		size_t len = strlen(filename);
+		if ((len + 7) < FILENAME_BUFF_SIZE) {
+			strcpy(filename + len, " slave");
+		} else {
+			strcpy((filename + len) - 10, "... slave");
+		}
+		fd_table_insert_intern(fd_table, dup_fd, filename, cloexec);
 	} else {
-		fd_table_insert_intern(fd_table, dup_fd, entry->filename, false);
+		fd_table_insert_intern(fd_table, dup_fd, entry->filename, cloexec);
 	}
 	g_mutex_unlock(fd_mutex);
 }
