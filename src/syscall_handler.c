@@ -144,7 +144,7 @@ static void handle_close_return(pid_t tracee, int sc) {
 }
 
 
-// ---- read/readv ----
+// ---- read/readv/preadv/preadv2 ----
 
 static void handle_read_call(pid_t tracee, int sc) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
@@ -166,7 +166,7 @@ static void handle_read_return(pid_t tracee, int sc) {
 }
 
 
-// ---- write/writev ----
+// ---- write/writev/pwritev/pwritev2 ----
 
 static void handle_write_call(pid_t tracee, int sc) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
@@ -421,7 +421,7 @@ static void handle_execve_return(pid_t tracee) {
 
 static void handle_ioctl_call(pid_t tracee) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
-    tmps->int_a = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
+	tmps->int_a = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RDI);
 	tmps->int_b = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RSI);
 }
 
