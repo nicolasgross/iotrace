@@ -144,7 +144,7 @@ static void handle_close_return(pid_t tracee, int sc) {
 }
 
 
-// ---- read ----
+// ---- read/readv ----
 
 static void handle_read_call(pid_t tracee, int sc) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
@@ -166,7 +166,7 @@ static void handle_read_return(pid_t tracee, int sc) {
 }
 
 
-// ---- write ----
+// ---- write/writev ----
 
 static void handle_write_call(pid_t tracee, int sc) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
@@ -463,9 +463,15 @@ void handle_syscall_call(pid_t tracee, int sc) {
 			handle_close_call(tracee, sc);
 			return;
 		case SYS_read:
+		case SYS_readv:
+		case SYS_preadv:
+		case SYS_preadv2:
 			handle_read_call(tracee, sc);
 			return;
 		case SYS_write:
+		case SYS_writev:
+		case SYS_pwritev:
+		case SYS_pwritev2:
 			handle_write_call(tracee, sc);
 			return;
 		case SYS_pipe:
@@ -530,9 +536,15 @@ void handle_syscall_return(pid_t tracee, int sc) {
 			handle_close_return(tracee, sc);
 			return;
 		case SYS_read:
+		case SYS_readv:
+		case SYS_preadv:
+		case SYS_preadv2:
 			handle_read_return(tracee, sc);
 			return;
 		case SYS_write:
+		case SYS_writev:
+		case SYS_pwritev:
+		case SYS_pwritev2:
 			handle_write_return(tracee, sc);
 			return;
 		case SYS_pipe:
