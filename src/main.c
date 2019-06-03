@@ -89,9 +89,9 @@ static void threads_add(pid_t tracee, pid_t parents_tracee, int clone_flags) {
 	g_mutex_unlock(&threads_mutex);
 }
 
-static int wait_for_syscall(pid_t tracee) {
+static int wait_for_syscall(pid_t tracee, int *sig) {
 	int status;
-	ptrace(PTRACE_SYSCALL, tracee, NULL, NULL);
+	ptrace(PTRACE_SYSCALL, tracee, 0, *sig);
 	while (1) {
 		waitpid(tracee, &status, __WALL);
 		if (status >> 8 == (SIGTRAP | (PTRACE_EVENT_CLONE << 8)) ||
@@ -109,6 +109,7 @@ static int wait_for_syscall(pid_t tracee) {
 
 		if (WIFSTOPPED(status) && WSTOPSIG(status) == (SIGTRAP | 0x80)) {
 			// stopped by a syscall
+			*sig = 0;
 			return 0;
 		}
 
@@ -117,7 +118,12 @@ static int wait_for_syscall(pid_t tracee) {
 			return 1;
 		}
 
-		ptrace(PTRACE_SYSCALL, tracee, NULL, NULL);
+		if (WIFSTOPPED(status)) {
+			// signal delivery stop
+			ptrace(PTRACE_SYSCALL, tracee, 0, WSTOPSIG(status));
+		} else {
+			ptrace(PTRACE_SYSCALL, tracee, 0, 0);
+		}
 	}
 }
 
@@ -129,19 +135,21 @@ static void start_tracer(pid_t tracee) {
 	       PTRACE_O_TRACECLONE |    // trace cloned processes
 	       PTRACE_O_TRACEFORK |     // trace forked processes
 	       PTRACE_O_TRACEVFORK |    // trace vforked processes
+	       PTRACE_O_TRACEEXEC |     // disable legacy sigtrap on execve
 	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
 
 	int syscall;
+	int sig = 0;
 	while (1) {
 		// syscall call
-		if (wait_for_syscall(tracee)) {
+		if (wait_for_syscall(tracee, &sig)) {
 			break;
 		}
 		syscall = (int) ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * ORIG_RAX);
 		handle_syscall_call(tracee, syscall);
 
 		// syscall return
-		if (wait_for_syscall(tracee)) {
+		if (wait_for_syscall(tracee, &sig)) {
 			break;
 		}
 		handle_syscall_return(tracee, syscall);
