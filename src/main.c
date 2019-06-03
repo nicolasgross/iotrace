@@ -211,7 +211,7 @@ static int main_tracer(pid_t tracee, char const *json_filename) {
 	char *mpi_rank;
 	get_mpi_rank(&mpi_rank);
 	char filename[strlen(json_filename) + strlen(hostname) + 10];
-	sprintf(filename, "%s_%s_r%s.json", json_filename, hostname,
+	sprintf(filename, "%s_%s_rank%s.json", json_filename, hostname,
 	        mpi_rank ? mpi_rank : "NULL");
 	if (print_stats_as_json(filename)) {
 		printf("File statistics were written to '%s'\n", filename);
@@ -233,15 +233,15 @@ int main(int argc, char **argv) {
 	GError *error = NULL;
 	GOptionContext *context;
 
-	context = g_option_context_new("OUTPUT_FILE PROG [PROG_ARG\u2026]");
+	context = g_option_context_new("TRACE_ID PROG [PROG_ARGS\u2026]");
 	g_option_context_set_summary(context, "Analyzes the I/O behavior of a "
-			"program and prints the results to a JSON file. The analysis "
-			"comprises ... TBD ...\n" // TODO explain full functionality
-			"The argument OUTPUT_FILE is the location of the JSON output "
-			"file, PROG is the program that should be analyzed and "
-			"[PROG_ARG\u2026] are its arguments.\n"
+			"executable and prints the results to JSON files.\n"
+			"TRACE_ID: The identifier/name of the trace, which is part of the "
+			"output files' names.\n"
+			"PROG: The executable that should be analyzed.\n"
+			"PROG_ARGS: The program's arguments.\n"
 			"\n"
-			"The JSON output is formatted as follows:\n"
+			"The JSON output files are formatted as follows:\n"
 			"open : [ 'count', 'total nanosecs', 'min nanosecs', "
 			"'max nanosecs' ]\n"
 			"close : [ 'count', 'total nanosecs', 'min nanosecs', "
