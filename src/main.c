@@ -168,7 +168,7 @@ static void get_mpi_rank(char **rank) {
 	}
 }
 
-static int main_tracer(pid_t tracee, char const *json_filename) {
+static int main_tracer(pid_t tracee, char const *trace_id) {
 	thread_tmps_init();
 	file_stat_init();
 	syscall_stat_init();
@@ -208,8 +208,8 @@ static int main_tracer(pid_t tracee, char const *json_filename) {
 	gethostname(hostname, 256);
 	char *mpi_rank;
 	get_mpi_rank(&mpi_rank);
-	char filename[strlen(json_filename) + strlen(hostname) + 10];
-	sprintf(filename, "%s_%s_rank%s.json", json_filename, hostname,
+	char filename[strlen(trace_id) + strlen(hostname) + 12];
+	sprintf(filename, "%s_%s_%s.json", trace_id, hostname,
 	        mpi_rank ? mpi_rank : "NULL");
 	if (print_stats_as_json(filename)) {
 		printf("File statistics were written to '%s'\n", filename);
