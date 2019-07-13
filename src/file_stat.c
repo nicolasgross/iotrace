@@ -114,8 +114,7 @@ static void file_stat_incr_rw(read_write_stat *stat, unsigned long long const ti
 	if (bytes > 0) {
 		stat->total_b += bytes;
 		double time_s = time_ns / 1000000000.0;
-		double factor = 1.0 / time_s;
-		double bps = bytes * factor;
+		double bps = bytes / time_s;
 		if (stat->min_bps > bps) {
 			stat->min_bps = bps;
 		}

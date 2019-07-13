@@ -244,11 +244,11 @@ int main(int argc, char **argv) {
 			"'max nanosecs' ]\n"
 			"close : [ 'count', 'total nanosecs', 'min nanosecs', "
 			"'max nanosecs' ]\n"
-			"read : [ 'total bytes', 'total nanosecs', 'min nanosecs', "
-			"'max nanosecs' ]\n"
+			"read : [ 'total bytes', 'total nanosecs', 'min byte/sec', "
+			"'max byte/sec' ]\n"
 			"read-blocks : [ [ 'number of bytes', 'count' ], ... ]\n"
-			"write : [ 'total bytes', 'total nanosecs', 'min nanosecs', "
-			"'max nanosecs' ]\n"
+			"write : [ 'total bytes', 'total nanosecs', 'min byte/sec', "
+			"'max byte/sec' ]\n"
 			"write-blocks : [ [ 'number of bytes', 'count' ], ... ]\n");
 	g_option_context_set_strict_posix(context, true);
 	g_option_context_add_main_entries(context, entries, NULL);
