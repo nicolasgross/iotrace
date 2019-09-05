@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
 	GOptionContext *context;
 
 	context = g_option_context_new("TRACE_ID PROG [PROG_ARGS\u2026]");
-	g_option_context_set_summary(context, "Analyzes the I/O behavior of a "
+	g_option_context_set_summary(context, "Analyzes the I/O behavior of an "
 			"executable and prints the results to JSON files.\n"
 			"TRACE_ID: The identifier/name of the trace, which is part of the "
 			"output files' names.\n"
@@ -249,7 +249,7 @@ int main(int argc, char **argv) {
 			"read-blocks : [ [ 'number of bytes', 'count' ], ... ]\n"
 			"write : [ 'total bytes', 'total nanosecs', 'min byte/sec', "
 			"'max byte/sec' ]\n"
-			"write-blocks : [ [ 'number of bytes', 'count' ], ... ]\n");
+			"write-blocks : [ [ 'number of bytes', 'count' ], ... ]");
 	g_option_context_set_strict_posix(context, true);
 	g_option_context_add_main_entries(context, entries, NULL);
 	if (!g_option_context_parse(context, &argc, &argv, &error)) {
