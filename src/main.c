@@ -211,7 +211,7 @@ static int main_tracer(pid_t tracee, char const *trace_id) {
 	char filename[strlen(trace_id) + strlen(hostname) + 12];
 	sprintf(filename, "%s_%s_%s.json", trace_id, hostname,
 	        mpi_rank ? mpi_rank : "NULL");
-	if (print_stats_as_json(filename)) {
+	if (print_stats_as_json(filename, hostname, mpi_rank)) {
 		printf("File statistics were written to '%s'\n", filename);
 		printf("Run 'iotrace --help' to get information about the JSON output "
 		       "format\n");

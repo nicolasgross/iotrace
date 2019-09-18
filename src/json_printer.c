@@ -115,10 +115,15 @@ static void builder_add_syscall_stats(JsonBuilder *builder) {
 	json_builder_end_array(builder);
 }
 
-static JsonBuilder *create_builder(void) {
+static JsonBuilder *create_builder(char const *hostname, char const *rank) {
 	// Initialize builder
 	JsonBuilder *builder = json_builder_new();
 	json_builder_begin_object(builder);
+
+	json_builder_set_member_name(builder, "hostname");
+	json_builder_add_string_value(builder, (char *) hostname);
+	json_builder_set_member_name(builder, "rank");
+	json_builder_add_string_value(builder, (char *) rank ? rank : "NULL");
 
 	builder_add_file_stats(builder);
 	builder_add_syscall_stats(builder);
@@ -128,13 +133,14 @@ static JsonBuilder *create_builder(void) {
 	return builder;
 }
 
-bool print_stats_as_json(char const *filename) {
+bool print_stats_as_json(char const *filename, char const *hostname,
+	                     char const *rank) {
 	JsonGenerator *gen = json_generator_new();
 	json_generator_set_indent_char(gen, ' ');
 	json_generator_set_indent(gen, 2);
 	json_generator_set_pretty(gen, true);
 
-	JsonBuilder *builder = create_builder();
+	JsonBuilder *builder = create_builder(hostname, rank);
 	JsonNode *root = json_builder_get_root(builder);
 	json_generator_set_root(gen, root);
 	bool success = json_generator_to_file(gen, filename, NULL);
