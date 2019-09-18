@@ -115,11 +115,14 @@ static void builder_add_syscall_stats(JsonBuilder *builder) {
 	json_builder_end_array(builder);
 }
 
-static JsonBuilder *create_builder(char const *hostname, char const *rank) {
+static JsonBuilder *create_builder(char const *trace_id, char const *hostname,
+                                   char const *rank) {
 	// Initialize builder
 	JsonBuilder *builder = json_builder_new();
 	json_builder_begin_object(builder);
 
+	json_builder_set_member_name(builder, "trace-id");
+	json_builder_add_string_value(builder, (char *) trace_id);
 	json_builder_set_member_name(builder, "hostname");
 	json_builder_add_string_value(builder, (char *) hostname);
 	json_builder_set_member_name(builder, "rank");
@@ -133,14 +136,14 @@ static JsonBuilder *create_builder(char const *hostname, char const *rank) {
 	return builder;
 }
 
-bool print_stats_as_json(char const *filename, char const *hostname,
-	                     char const *rank) {
+bool print_stats_as_json(char const *filename, char const *trace_id,
+	                     char const *hostname, char const *rank) {
 	JsonGenerator *gen = json_generator_new();
 	json_generator_set_indent_char(gen, ' ');
 	json_generator_set_indent(gen, 2);
 	json_generator_set_pretty(gen, true);
 
-	JsonBuilder *builder = create_builder(hostname, rank);
+	JsonBuilder *builder = create_builder(trace_id, hostname, rank);
 	JsonNode *root = json_builder_get_root(builder);
 	json_generator_set_root(gen, root);
 	bool success = json_generator_to_file(gen, filename, NULL);
