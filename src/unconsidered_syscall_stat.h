@@ -10,17 +10,19 @@ typedef struct {
 } syscall_stat;
 
 
-void syscall_stat_init(void);
+GHashTable *syscall_stat_create(void);
 
-void syscall_stat_free(void);
+void syscall_stat_free(GHashTable *syscall_table);
 
-syscall_stat *syscall_stat_get(int const syscall);
+syscall_stat *syscall_stat_get(GHashTable *syscall_table, int const syscall);
 
-GHashTable *syscall_stat_get_all(void);
+void syscall_stat_incr(GHashTable *syscall_table, int const syscall,
+                       unsigned long long const time_ns);
 
-void syscall_stat_incr(int const syscall, unsigned long long const time_ns);
+void syscall_stat_merge(GHashTable *syscall_table_1,
+                        GHashTable *syscall_table_2);
 
-void syscall_stat_print_all(void);
+void syscall_stat_print_all(GHashTable *syscall_table);
 
 
 #endif

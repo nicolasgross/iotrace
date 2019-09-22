@@ -11,11 +11,13 @@
  * @param trace_id the trace id of the statistics.
  * @param hostname the hostname to which the statistics belong.
  * @param rank the rank to which the statistics belong.
+ * @param syscall_table syscall statistics.
  * @return true if saving to the JSON file was successful.
  *
  */
 bool print_stats_as_json(char const *filename, char const *trace_id,
-                         char const *hostname, char const *rank);
+                         char const *hostname, char const *rank,
+                         GHashTable *syscall_table);
 
 
 #endif

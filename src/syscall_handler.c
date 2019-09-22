@@ -443,10 +443,11 @@ static void handle_unconsidered_call(pid_t tracee, int sc) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_unconsidered_return(pid_t tracee, int sc) {
+static void handle_unconsidered_return(pid_t tracee, int sc,
+                                       GHashTable *syscall_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
-	syscall_stat_incr(sc, elapsed_ns);
+	syscall_stat_incr(syscall_table, sc, elapsed_ns);
 }
 
 
@@ -523,7 +524,7 @@ void handle_syscall_call(pid_t tracee, int sc) {
 	handle_unconsidered_call(tracee, sc);
 }
 
-void handle_syscall_return(pid_t tracee, int sc) {
+void handle_syscall_return(pid_t tracee, int sc, GHashTable *syscall_table) {
 	// file statistics
 	switch (sc) {
 		case SYS_open:
@@ -580,7 +581,7 @@ void handle_syscall_return(pid_t tracee, int sc) {
 	}
 
 	// unconsidered syscalls
-	handle_unconsidered_return(tracee, sc);
+	handle_unconsidered_return(tracee, sc, syscall_table);
 	switch (sc) {
 		case SYS_dup:
 		case SYS_dup2:
