@@ -31,6 +31,8 @@ static GOptionEntry entries[] = {
 static volatile guint active_threads = 0;
 static GList *threads = NULL;
 static GMutex threads_mutex;
+static GHashTable *main_file_stat_table = NULL;
+static GMutex main_file_stat_table_mutex;
 static GHashTable *main_syscall_table = NULL;
 static GMutex main_syscall_table_mutex;
 
@@ -139,6 +141,7 @@ static void start_tracer(pid_t tracee) {
 	       PTRACE_O_TRACEEXEC |     // disable legacy sigtrap on execve
 	       PTRACE_O_EXITKILL);      // send SIGKILL to tracee if tracer exits
 
+	GHashTable *file_stat_table = file_stat_create();
 	GHashTable *syscall_table = syscall_stat_create();
 	int syscall;
 	while (1) {
@@ -153,12 +156,18 @@ static void start_tracer(pid_t tracee) {
 		if (wait_for_syscall(tracee)) {
 			break;
 		}
-		handle_syscall_return(tracee, syscall, syscall_table);
+		handle_syscall_return(tracee, syscall, file_stat_table, syscall_table);
 	}
+
+	g_mutex_lock(&main_file_stat_table_mutex);
+	file_state_merge(main_file_stat_table, file_stat_table);
+	g_mutex_unlock(&main_file_stat_table_mutex);
 
 	g_mutex_lock(&main_syscall_table_mutex);
 	syscall_stat_merge(main_syscall_table, syscall_table);
 	g_mutex_unlock(&main_syscall_table_mutex);
+
+	file_stat_free(file_stat_table);
 	syscall_stat_free(syscall_table);
 	thread_tmps_remove(tracee);
 }
@@ -177,7 +186,7 @@ static void get_mpi_rank(char **rank) {
 
 static int main_tracer(pid_t tracee, char const *trace_id) {
 	thread_tmps_init();
-	file_stat_init();
+	main_file_stat_table = file_stat_create();
 	main_syscall_table = syscall_stat_create();
 
 	GHashTable *main_fd_table = fd_table_create();
@@ -206,7 +215,7 @@ static int main_tracer(pid_t tracee, char const *trace_id) {
 	// print stats
 	printf("\n");
 	if (verbose) {
-		file_stat_print_all();
+		file_stat_print_all(main_file_stat_table);
 		syscall_stat_print_all(main_syscall_table);
 	}
 
@@ -219,7 +228,7 @@ static int main_tracer(pid_t tracee, char const *trace_id) {
 	sprintf(filename, "%s_%s_%s.json", trace_id, hostname,
 	        mpi_rank ? mpi_rank : "NULL");
 	if (print_stats_as_json(filename, trace_id, hostname, mpi_rank,
-	                        main_syscall_table)) {
+	                        main_file_stat_table, main_syscall_table)) {
 		printf("File statistics were written to '%s'\n", filename);
 		printf("Run 'iotrace --help' to get information about the JSON output "
 		       "format\n");
@@ -230,7 +239,7 @@ static int main_tracer(pid_t tracee, char const *trace_id) {
 
 	g_list_free(threads);
 	thread_tmps_free();
-	file_stat_free();
+	file_stat_free(main_file_stat_table);
 	syscall_stat_free(main_syscall_table);
 	return err;
 }

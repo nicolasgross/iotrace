@@ -7,10 +7,6 @@
 #define MIN_BPS_INITIAL 9999999999999.0
 
 
-static GHashTable *stat_table;
-static GMutex stats_mutex;
-
-
 static void init_file_stat(file_stat *stat) {
 	stat->open_stats.count = 0;
 	stat->open_stats.total_ns = 0;
@@ -37,13 +33,14 @@ static void init_file_stat(file_stat *stat) {
 	                                                 free, free);
 }
 
-static void stat_table_insert(char const *filename) {
+static void stat_table_insert(GHashTable *file_stat_table,
+                              char const *filename) {
 	size_t len = strlen(filename);
 	char *name_mem = malloc(sizeof(char) * (len + 1));
 	strcpy(name_mem, filename);
 	file_stat *stat_mem = malloc(sizeof(file_stat));
 	init_file_stat(stat_mem);
-	g_hash_table_insert(stat_table, name_mem, stat_mem);
+	g_hash_table_insert(file_stat_table, name_mem, stat_mem);
 }
 
 static void free_single_file_stat(gpointer stat) {
@@ -53,36 +50,34 @@ static void free_single_file_stat(gpointer stat) {
 	free(stat);
 }
 
-void file_stat_init(void) {
-	stat_table = g_hash_table_new_full(g_str_hash, g_str_equal, free,
-	                                   free_single_file_stat);
-	stat_table_insert("NULL");
+GHashTable *file_stat_create(void) {
+	GHashTable *table = g_hash_table_new_full(g_str_hash, g_str_equal, free,
+	                                          free_single_file_stat);
+	stat_table_insert(table, "NULL");
+	return table;
 }
 
-void file_stat_free(void) {
-	g_hash_table_destroy(stat_table);
+void file_stat_free(GHashTable *file_stat_table) {
+	g_hash_table_destroy(file_stat_table);
 }
 
-file_stat *file_stat_get(char const *filename) {
-	return g_hash_table_lookup(stat_table, filename);
+file_stat *file_stat_get(GHashTable *file_stat_table, char const *filename) {
+	return g_hash_table_lookup(file_stat_table, filename);
 }
 
-GHashTable *file_stat_get_all(void) {
-	return stat_table;
-}
-
-static file_stat *file_stat_get_safe(char const *filename) {
-	file_stat *tmp = file_stat_get(filename);
+static file_stat *file_stat_get_safe(GHashTable *file_stat_table,
+                                     char const *filename) {
+	file_stat *tmp = file_stat_get(file_stat_table, filename);
 	if (tmp == NULL) {
-		stat_table_insert(filename);
-		tmp = file_stat_get(filename);
+		stat_table_insert(file_stat_table, filename);
+		tmp = file_stat_get(file_stat_table, filename);
 	}
 	return tmp;
 }
 
-void file_stat_incr_open(char const *filename, unsigned long long const time_ns) {
-	g_mutex_lock(&stats_mutex);
-	file_stat *tmp = file_stat_get_safe(filename);
+void file_stat_incr_open(GHashTable *file_stat_table, char const *filename,
+                         unsigned long long const time_ns) {
+	file_stat *tmp = file_stat_get_safe(file_stat_table, filename);
 	tmp->open_stats.count++;
 	tmp->open_stats.total_ns += time_ns;
 	if (tmp->open_stats.min_ns > time_ns) {
@@ -91,12 +86,11 @@ void file_stat_incr_open(char const *filename, unsigned long long const time_ns)
 	if (tmp->open_stats.max_ns < time_ns) {
 		tmp->open_stats.max_ns = time_ns;
 	}
-	g_mutex_unlock(&stats_mutex);
 }
 
-void file_stat_incr_close(char const *filename, unsigned long long const time_ns) {
-	g_mutex_lock(&stats_mutex);
-	file_stat *tmp = file_stat_get_safe(filename);
+void file_stat_incr_close(GHashTable *file_stat_table, char const *filename,
+                          unsigned long long const time_ns) {
+	file_stat *tmp = file_stat_get_safe(file_stat_table, filename);
 	tmp->close_stats.count++;
 	tmp->close_stats.total_ns += time_ns;
 	if (tmp->close_stats.min_ns > time_ns) {
@@ -105,7 +99,6 @@ void file_stat_incr_close(char const *filename, unsigned long long const time_ns
 	if (tmp->close_stats.max_ns < time_ns) {
 		tmp->close_stats.max_ns = time_ns;
 	}
-	g_mutex_unlock(&stats_mutex);
 }
 
 static void file_stat_incr_rw(read_write_stat *stat, unsigned long long const time_ns,
@@ -134,29 +127,97 @@ static void file_stat_incr_rw(read_write_stat *stat, unsigned long long const ti
 	*count += 1;
 }
 
-void file_stat_incr_read(char const *filename, unsigned long long const time_ns,
+void file_stat_incr_read(GHashTable *file_stat_table, char const *filename,
+                         unsigned long long const time_ns,
                          ssize_t const bytes) {
-	g_mutex_lock(&stats_mutex);
-	file_stat *tmp = file_stat_get_safe(filename);
+	file_stat *tmp = file_stat_get_safe(file_stat_table, filename);
 	file_stat_incr_rw(&tmp->read_stats, time_ns, bytes);
-	g_mutex_unlock(&stats_mutex);
 }
 
-void file_stat_incr_write(char const *filename, unsigned long long const time_ns,
+void file_stat_incr_write(GHashTable *file_stat_table, char const *filename,
+                          unsigned long long const time_ns,
                           ssize_t const bytes) {
-	g_mutex_lock(&stats_mutex);
-	file_stat *tmp = file_stat_get_safe(filename);
+	file_stat *tmp = file_stat_get_safe(file_stat_table, filename);
 	file_stat_incr_rw(&tmp->write_stats, time_ns, bytes);
-	g_mutex_unlock(&stats_mutex);
 }
 
-void file_stat_print_all(void) {
+static void merge_open_close(open_close_stat *stat_1, open_close_stat *stat_2) {
+	stat_1->count += stat_2->count;
+	if (stat_1->min_ns > stat_2->min_ns) {
+		stat_1->min_ns = stat_2->min_ns;
+	}
+	if (stat_1->max_ns < stat_2->max_ns) {
+		stat_1->max_ns = stat_2->max_ns;
+	}
+	stat_1->total_ns += stat_2->total_ns;
+}
+
+static void merge_read_write(read_write_stat *stat_1, read_write_stat *stat_2) {
+	stat_1->total_b += stat_2->total_b;
+	stat_1->total_ns += stat_2->total_ns;
+	if (stat_1->min_bps > stat_2->min_bps) {
+		stat_1->min_bps = stat_2->min_bps;
+	}
+	if (stat_1->max_bps < stat_2->max_bps) {
+		stat_1->max_bps = stat_2->max_bps;
+	}
+}
+
+static void merge_blocks(GHashTable *blocks_1, GHashTable *blocks_2) {
+	GHashTableIter subiter;
+	gpointer subkey;
+	gpointer subvalue;
+	g_hash_table_iter_init (&subiter, blocks_2);
+	while (g_hash_table_iter_next (&subiter, &subkey, &subvalue)) {
+		ssize_t *bytes = subkey;
+		unsigned long *count_2 = subvalue;
+		unsigned long *count_1 = g_hash_table_lookup(blocks_1, bytes);
+		if (count_1 == NULL) {
+			ssize_t *key = malloc(sizeof(ssize_t));
+			*key = *bytes;
+			unsigned long *value = malloc(sizeof(unsigned long));
+			*value = 0;
+			g_hash_table_insert(blocks_1, key, value);
+			count_1 = value;
+		}
+		*count_1 += *count_2;
+	}
+}
+
+void file_state_merge(GHashTable *file_stat_table_1,
+                      GHashTable *file_stat_table_2) {
+	GHashTableIter iter;
+	gpointer key;
+	gpointer value;
+	g_hash_table_iter_init (&iter, file_stat_table_2);
+
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		char *file = key;
+		file_stat *stat_2 = value;
+		file_stat *stat_1 = file_stat_get(file_stat_table_1, file);
+		if (stat_1 == NULL) {
+			stat_table_insert(file_stat_table_1, file);
+			stat_1 = file_stat_get(file_stat_table_1, file);
+		}
+
+		merge_open_close(&stat_1->open_stats, &stat_2->open_stats);
+		merge_open_close(&stat_1->close_stats, &stat_2->close_stats);
+
+		merge_read_write(&stat_1->read_stats, &stat_2->read_stats);
+		merge_blocks(stat_1->read_stats.blocks, stat_2->read_stats.blocks);
+
+		merge_read_write(&stat_1->write_stats, &stat_2->write_stats);
+		merge_blocks(stat_1->write_stats.blocks, stat_2->write_stats.blocks);
+	}
+}
+
+void file_stat_print_all(GHashTable *file_stat_table) {
 	printf("FILE STATISTICS:\n\n");
 
 	GHashTableIter iter;
 	gpointer key;
 	gpointer value;
-	g_hash_table_iter_init (&iter, stat_table);
+	g_hash_table_iter_init (&iter, file_stat_table);
 
 	while (g_hash_table_iter_next (&iter, &key, &value)) {
 		file_stat *tmp = value;

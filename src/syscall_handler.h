@@ -6,7 +6,8 @@
 
 void handle_syscall_call(pid_t tracee, int sc);
 
-void handle_syscall_return(pid_t tracee, int sc, GHashTable *syscall_table);
+void handle_syscall_return(pid_t tracee, int sc, GHashTable *file_stat_table,
+                           GHashTable *syscall_table);
 
 
 #endif

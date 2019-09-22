@@ -110,7 +110,8 @@ static void handle_open_call(pid_t tracee, int sc, bool openat) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_open_return(pid_t tracee, int sc) {
+static void handle_open_return(pid_t tracee, int sc,
+                               GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
@@ -118,7 +119,7 @@ static void handle_open_return(pid_t tracee, int sc) {
 		fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd,
 		                tmps->filename_buffer, (tmps->int_a & O_CLOEXEC) != 0);
 	}
-	file_stat_incr_open(tmps->filename_buffer, elapsed_ns);
+	file_stat_incr_open(file_stat_table, tmps->filename_buffer, elapsed_ns);
 }
 
 
@@ -130,7 +131,8 @@ static void handle_close_call(pid_t tracee, int sc) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_close_return(pid_t tracee, int sc) {
+static void handle_close_return(pid_t tracee, int sc,
+                                GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	g_mutex_lock(tmps->fd_mutex);
@@ -138,7 +140,7 @@ static void handle_close_return(pid_t tracee, int sc) {
 	if (filename == NULL) {
 		filename = "NULL";
 	}
-	file_stat_incr_close(filename, elapsed_ns);
+	file_stat_incr_close(file_stat_table, filename, elapsed_ns);
 	g_mutex_unlock(tmps->fd_mutex);
 	fd_table_remove(tmps->fd_table, tmps->fd_mutex, tmps->int_a);
 }
@@ -152,7 +154,8 @@ static void handle_read_call(pid_t tracee, int sc) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_read_return(pid_t tracee, int sc) {
+static void handle_read_return(pid_t tracee, int sc,
+                               GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
@@ -161,7 +164,7 @@ static void handle_read_return(pid_t tracee, int sc) {
 	if (filename == NULL) {
 		filename = "NULL";
 	}
-	file_stat_incr_read(filename, elapsed_ns, ret_bytes);
+	file_stat_incr_read(file_stat_table, filename, elapsed_ns, ret_bytes);
 	g_mutex_unlock(tmps->fd_mutex);
 }
 
@@ -174,7 +177,8 @@ static void handle_write_call(pid_t tracee, int sc) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_write_return(pid_t tracee, int sc) {
+static void handle_write_return(pid_t tracee, int sc,
+                                GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	ssize_t ret_bytes = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
@@ -183,7 +187,7 @@ static void handle_write_return(pid_t tracee, int sc) {
 	if (filename == NULL) {
 		filename = "NULL";
 	}
-	file_stat_incr_write(filename, elapsed_ns, ret_bytes);
+	file_stat_incr_write(file_stat_table, filename, elapsed_ns, ret_bytes);
 	g_mutex_unlock(tmps->fd_mutex);
 }
 
@@ -199,7 +203,8 @@ static void handle_pipe_call(pid_t tracee, int sc, bool pipe2) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_pipe_return(pid_t tracee, int sc, bool pipe2) {
+static void handle_pipe_return(pid_t tracee, int sc, bool pipe2,
+                               GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	if (ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX) == 0) {
@@ -217,8 +222,8 @@ static void handle_pipe_return(pid_t tracee, int sc, bool pipe2) {
 			fd_table_insert(tmps->fd_table, tmps->fd_mutex, pipefd_write,
 			                PIPE_W, false);
 		}
-		file_stat_incr_open(PIPE_R, elapsed_ns/2);
-		file_stat_incr_open(PIPE_W, elapsed_ns/2);
+		file_stat_incr_open(file_stat_table, PIPE_R, elapsed_ns/2);
+		file_stat_incr_open(file_stat_table, PIPE_W, elapsed_ns/2);
 	}
 }
 
@@ -231,7 +236,8 @@ static void handle_socket_call(pid_t tracee, int sc) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_socket_return(pid_t tracee, int sc) {
+static void handle_socket_return(pid_t tracee, int sc,
+                                 GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
@@ -239,7 +245,7 @@ static void handle_socket_return(pid_t tracee, int sc) {
 		fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd,
 		                SOCKET, (tmps->int_a & SOCK_CLOEXEC) != 0);
 	}
-	file_stat_incr_open(SOCKET, elapsed_ns);
+	file_stat_incr_open(file_stat_table, SOCKET, elapsed_ns);
 }
 
 
@@ -251,7 +257,8 @@ static void handle_socketpair_call(pid_t tracee, int sc) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_socketpair_return(pid_t tracee, int sc) {
+static void handle_socketpair_return(pid_t tracee, int sc,
+                                     GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	if (ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX) == 0) {
@@ -260,8 +267,8 @@ static void handle_socketpair_return(pid_t tracee, int sc) {
 		int socket_b = ptrace(PTRACE_PEEKDATA, tracee, socket_pair + 1, NULL);
 		fd_table_insert(tmps->fd_table, tmps->fd_mutex, socket_a, SOCKET, false);
 		fd_table_insert(tmps->fd_table, tmps->fd_mutex, socket_b, SOCKET, false);
-		file_stat_incr_open(SOCKET, elapsed_ns/2);
-		file_stat_incr_open(SOCKET, elapsed_ns/2);
+		file_stat_incr_open(file_stat_table, SOCKET, elapsed_ns/2);
+		file_stat_incr_open(file_stat_table, SOCKET, elapsed_ns/2);
 	}
 }
 
@@ -276,7 +283,8 @@ static void handle_eventfd_call(pid_t tracee, int sc, bool eventfd2) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_eventfd_return(pid_t tracee, int sc, bool eventfd2) {
+static void handle_eventfd_return(pid_t tracee, int sc, bool eventfd2,
+                                  GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
@@ -288,7 +296,7 @@ static void handle_eventfd_return(pid_t tracee, int sc, bool eventfd2) {
 			fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd, EVENTFD, false);
 		}
 	}
-	file_stat_incr_open(EVENTFD, elapsed_ns);
+	file_stat_incr_open(file_stat_table, EVENTFD, elapsed_ns);
 }
 
 
@@ -302,7 +310,8 @@ static void handle_epollcreate_call(pid_t tracee, int sc, bool epoll_create1) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_epollcreate_return(pid_t tracee, int sc, bool epoll_create1) {
+static void handle_epollcreate_return(pid_t tracee, int sc, bool epoll_create1,
+                                      GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
@@ -314,7 +323,7 @@ static void handle_epollcreate_return(pid_t tracee, int sc, bool epoll_create1) 
 			fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd, EPOLL, false);
 		}
 	}
-	file_stat_incr_open(EPOLL, elapsed_ns);
+	file_stat_incr_open(file_stat_table, EPOLL, elapsed_ns);
 }
 
 
@@ -328,7 +337,8 @@ static void handle_accept_call(pid_t tracee, int sc, bool accept4) {
 	save_current_time(&tmps->start_time, sc);
 }
 
-static void handle_accept_return(pid_t tracee, int sc, bool accept4) {
+static void handle_accept_return(pid_t tracee, int sc, bool accept4,
+                                 GHashTable *file_stat_table) {
 	thread_tmps *tmps;
 	unsigned long long elapsed_ns = calc_elapsed_ns(tracee, &tmps, sc);
 	long ret_fd = ptrace(PTRACE_PEEKUSER, tracee, sizeof(long) * RAX);
@@ -340,7 +350,7 @@ static void handle_accept_return(pid_t tracee, int sc, bool accept4) {
 			fd_table_insert(tmps->fd_table, tmps->fd_mutex, ret_fd, ACCEPT, false);
 		}
 	}
-	file_stat_incr_open(ACCEPT, elapsed_ns);
+	file_stat_incr_open(file_stat_table, ACCEPT, elapsed_ns);
 }
 
 
@@ -524,59 +534,60 @@ void handle_syscall_call(pid_t tracee, int sc) {
 	handle_unconsidered_call(tracee, sc);
 }
 
-void handle_syscall_return(pid_t tracee, int sc, GHashTable *syscall_table) {
+void handle_syscall_return(pid_t tracee, int sc, GHashTable *file_stat_table,
+                           GHashTable *syscall_table) {
 	// file statistics
 	switch (sc) {
 		case SYS_open:
-			handle_open_return(tracee, sc);
+			handle_open_return(tracee, sc, file_stat_table);
 			return;
 		case SYS_openat:
-			handle_open_return(tracee, sc);
+			handle_open_return(tracee, sc, file_stat_table);
 			return;
 		case SYS_close:
-			handle_close_return(tracee, sc);
+			handle_close_return(tracee, sc, file_stat_table);
 			return;
 		case SYS_read:
 		case SYS_readv:
 		case SYS_preadv:
 		case SYS_preadv2:
-			handle_read_return(tracee, sc);
+			handle_read_return(tracee, sc, file_stat_table);
 			return;
 		case SYS_write:
 		case SYS_writev:
 		case SYS_pwritev:
 		case SYS_pwritev2:
-			handle_write_return(tracee, sc);
+			handle_write_return(tracee, sc, file_stat_table);
 			return;
 		case SYS_pipe:
-			handle_pipe_return(tracee, sc, false);
+			handle_pipe_return(tracee, sc, false, file_stat_table);
 			return;
 		case SYS_pipe2:
-			handle_pipe_return(tracee, sc, true);
+			handle_pipe_return(tracee, sc, true, file_stat_table);
 			return;
 		case SYS_socket:
-			handle_socket_return(tracee, sc);
+			handle_socket_return(tracee, sc, file_stat_table);
 			return;
 		case SYS_socketpair:
-			handle_socketpair_return(tracee, sc);
+			handle_socketpair_return(tracee, sc, file_stat_table);
 			return;
 		case SYS_eventfd:
-			handle_eventfd_return(tracee, sc, false);
+			handle_eventfd_return(tracee, sc, false, file_stat_table);
 			return;
 		case SYS_eventfd2:
-			handle_eventfd_return(tracee, sc, true);
+			handle_eventfd_return(tracee, sc, true, file_stat_table);
 			return;
 		case SYS_epoll_create:
-			handle_epollcreate_return(tracee, sc, false);
+			handle_epollcreate_return(tracee, sc, false, file_stat_table);
 			return;
 		case SYS_epoll_create1:
-			handle_epollcreate_return(tracee, sc, true);
+			handle_epollcreate_return(tracee, sc, true, file_stat_table);
 			return;
 		case SYS_accept:
-			handle_accept_return(tracee, sc, false);
+			handle_accept_return(tracee, sc, false, file_stat_table);
 			return;
 		case SYS_accept4:
-			handle_accept_return(tracee, sc, true);
+			handle_accept_return(tracee, sc, true, file_stat_table);
 			return;
 	}
 

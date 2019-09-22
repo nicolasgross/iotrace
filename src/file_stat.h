@@ -28,25 +28,30 @@ typedef struct {
 } file_stat;
 
 
-void file_stat_init(void);
+GHashTable *file_stat_create(void);
 
-void file_stat_free(void);
+void file_stat_free(GHashTable *file_stat_table);
 
-file_stat *file_stat_get(char const *filename);
+file_stat *file_stat_get(GHashTable *file_stat_table, char const *filename);
 
-GHashTable *file_stat_get_all(void);
+void file_stat_incr_open(GHashTable *file_stat_table, char const *filename,
+                         unsigned long long const time_ns);
 
-void file_stat_incr_open(char const *filename, unsigned long long const time_ns);
+void file_stat_incr_close(GHashTable *file_stat_table, char const *filename,
+                          unsigned long long const time_ns);
 
-void file_stat_incr_close(char const *filename, unsigned long long const time_ns);
-
-void file_stat_incr_read(char const *filename, unsigned long long const time_ns,
+void file_stat_incr_read(GHashTable *file_stat_table, char const *filename,
+                         unsigned long long const time_ns,
                          ssize_t const bytes);
 
-void file_stat_incr_write(char const *filename, unsigned long long const time_ns,
+void file_stat_incr_write(GHashTable *file_stat_table, char const *filename,
+                          unsigned long long const time_ns,
                           ssize_t const bytes);
 
-void file_stat_print_all(void);
+void file_state_merge(GHashTable *file_stat_table_1,
+                      GHashTable *file_stat_table_2);
+
+void file_stat_print_all(GHashTable *file_stat_table);
 
 
 #endif

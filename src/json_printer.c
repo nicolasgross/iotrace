@@ -8,14 +8,15 @@
 #include "syscall_names.h"
 
 
-static void builder_add_file_stats(JsonBuilder *builder) {
+static void builder_add_file_stats(JsonBuilder *builder,
+                                   GHashTable *file_stat_table) {
 	json_builder_set_member_name(builder, "file statistics");
 	json_builder_begin_array(builder);
 
 	GHashTableIter iter, blocks_iter;
 	gpointer key, blocks_key;
 	gpointer value, blocks_value;
-	g_hash_table_iter_init (&iter, file_stat_get_all());
+	g_hash_table_iter_init (&iter, file_stat_table);
 	file_stat *stat;
 	while (g_hash_table_iter_next (&iter, &key, &value)) {
 		stat = value;
@@ -118,6 +119,7 @@ static void builder_add_syscall_stats(JsonBuilder *builder,
 
 static JsonBuilder *create_builder(char const *trace_id, char const *hostname,
                                    char const *rank,
+                                   GHashTable *file_stat_table,
                                    GHashTable *syscall_table) {
 	// Initialize builder
 	JsonBuilder *builder = json_builder_new();
@@ -130,7 +132,7 @@ static JsonBuilder *create_builder(char const *trace_id, char const *hostname,
 	json_builder_set_member_name(builder, "rank");
 	json_builder_add_string_value(builder, (char *) rank ? rank : "NULL");
 
-	builder_add_file_stats(builder);
+	builder_add_file_stats(builder, file_stat_table);
 	builder_add_syscall_stats(builder, syscall_table);
 
 	// Finalize builder
@@ -140,6 +142,7 @@ static JsonBuilder *create_builder(char const *trace_id, char const *hostname,
 
 bool print_stats_as_json(char const *filename, char const *trace_id,
                          char const *hostname, char const *rank,
+                         GHashTable *file_stat_table,
                          GHashTable *syscall_table) {
 	JsonGenerator *gen = json_generator_new();
 	json_generator_set_indent_char(gen, ' ');
@@ -147,7 +150,7 @@ bool print_stats_as_json(char const *filename, char const *trace_id,
 	json_generator_set_pretty(gen, true);
 
 	JsonBuilder *builder = create_builder(trace_id, hostname, rank,
-	                                      syscall_table);
+	                                      file_stat_table, syscall_table);
 	JsonNode *root = json_builder_get_root(builder);
 	json_generator_set_root(gen, root);
 	bool success = json_generator_to_file(gen, filename, NULL);
