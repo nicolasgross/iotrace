@@ -146,7 +146,7 @@ static void handle_close_return(pid_t tracee, int sc,
 }
 
 
-// ---- read/readv/preadv/preadv2 ----
+// ---- read/readv/preadv/preadv2/pread64 ----
 
 static void handle_read_call(pid_t tracee, int sc) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
@@ -169,7 +169,7 @@ static void handle_read_return(pid_t tracee, int sc,
 }
 
 
-// ---- write/writev/pwritev/pwritev2 ----
+// ---- write/writev/pwritev/pwritev2/pwrite64 ----
 
 static void handle_write_call(pid_t tracee, int sc) {
 	thread_tmps *tmps = thread_tmps_lookup(tracee);
@@ -477,12 +477,14 @@ void handle_syscall_call(pid_t tracee, int sc) {
 		case SYS_readv:
 		case SYS_preadv:
 		case SYS_preadv2:
+		case SYS_pread64:
 			handle_read_call(tracee, sc);
 			return;
 		case SYS_write:
 		case SYS_writev:
 		case SYS_pwritev:
 		case SYS_pwritev2:
+		case SYS_pwrite64:
 			handle_write_call(tracee, sc);
 			return;
 		case SYS_pipe:
@@ -551,12 +553,14 @@ void handle_syscall_return(pid_t tracee, int sc, GHashTable *file_stat_table,
 		case SYS_readv:
 		case SYS_preadv:
 		case SYS_preadv2:
+		case SYS_pread64:
 			handle_read_return(tracee, sc, file_stat_table);
 			return;
 		case SYS_write:
 		case SYS_writev:
 		case SYS_pwritev:
 		case SYS_pwritev2:
+		case SYS_pwrite64:
 			handle_write_return(tracee, sc, file_stat_table);
 			return;
 		case SYS_pipe:
