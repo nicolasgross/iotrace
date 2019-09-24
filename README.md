@@ -13,3 +13,9 @@ TODO
 - [ptrace blog post](https://www.cyphar.com/blog/post/20160703-remainroot-ptrace-hell)
 - [ptrace tips from the strace developers](https://github.com/strace/strace/blob/master/README-linux-ptrace)
 
+
+## License
+
+Copyright © 2019 HLRS, University of Stuttgart. iotrace is published under
+the terms of GPL3.
+
