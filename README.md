@@ -1,7 +1,7 @@
 # iotrace
-iotrace is a tracing tool that can provide information about the I/O behavior
-of a program. It builds upon the ptrace interface of the Linux kernel and is
-capable of collecting the following statistics:
+iotrace is a tracing tool that provides information about the I/O behavior of a
+program. It builds upon the ptrace interface of the Linux kernel and is capable
+of collecting the following statistics:
 - The number of times a file was opened/closed/read/written.
 - The time spent waiting for open/close/read/write to complete for each file.
 - The read/write speed for each file.
@@ -10,7 +10,6 @@ capable of collecting the following statistics:
 
 [iotrace-GUI](https://github.com/nicolasgross/iotrace-GUI) is a complementary
 tool for viewing/filtering/merging the trace results.
-
 
 iotrace was developed by [Nicolas Gross](https://github.com/nicolasgross) in
 the course of a student assistant job at the [HLRS](https://www.hlrs.de) under
